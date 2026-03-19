@@ -1,20 +1,20 @@
-import { LoginPayload, AuthResponse } from "../types"
+import { AuthResponse } from "../types"
 
-export const loginRequest = async (
-  payload: LoginPayload
+/**
+ * Autenticación con Google: envía el token de Google al backend y recibe el usuario y token propio.
+ * @param googleToken string - ID token de Google
+ * @returns Promise<AuthResponse>
+ */
+export const authWithGoogle = async (
+  googleToken: string
 ): Promise<AuthResponse> => {
-  // Simulación temporal hasta que backend esté listo
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        user: {
-          id: "1",
-          email: payload.email,
-          name: "Usuario Demo"
-        },
-        token: "fake-jwt-token"
-      })
-    }, 1000)
-  })
+  // TODO: Implementar llamada real al backend cuando esté disponible
+  // Ejemplo:
+  // const res = await fetch("/api/auth/google", {
+  //   method: "POST",
+  //   headers: { "Content-Type": "application/json" },
+  //   body: JSON.stringify({ token: googleToken })
+  // })
+  // return await res.json()
+  throw new Error("No implementado: conectar con backend de autenticación")
 }

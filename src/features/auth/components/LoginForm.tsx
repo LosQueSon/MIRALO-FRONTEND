@@ -1,88 +1,84 @@
 "use client"
-
-import { useState } from "react"
-import { loginRequest } from "../services/auth.service"
-import { useAuthStore } from "@/store/auth.store"
+import React, { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useAuthStore } from "@/store/auth.store"
+
+import { authWithGoogle } from "../services/auth.service"
+
+// Reemplaza con tu CLIENT_ID de Google Cloud Console
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-
-  const setAuth = useAuthStore((state) => state.setAuth)
+  const googleButton = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const setAuth = useAuthStore((state) => state.setAuth)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  useEffect(() => {
+    // Cargar el script de Google Identity Services
+    if (!window.google && !document.getElementById("google-identity")) {
+      const script = document.createElement("script")
+      script.src = "https://accounts.google.com/gsi/client"
+      script.async = true
+      script.defer = true
+      script.id = "google-identity"
+      document.body.appendChild(script)
+      script.onload = renderGoogleButton
+    } else {
+      renderGoogleButton()
+    }
+    // eslint-disable-next-line
+  }, [])
 
+  async function handleCredentialResponse(response: any) {
+    // Recibes el token de Google
+    const googleToken = response.credential
     try {
-      const response = await loginRequest({ email, password })
-      setAuth(response.user, response.token)
-      router.push("/")
-    } catch (error) {
-      console.error("Error en login:", error)
-    } finally {
-      setLoading(false)
+      // Llama al servicio de autenticación (listo para backend)
+      // const auth = await authWithGoogle(googleToken)
+      // setAuth(auth.user, auth.token)
+      // router.push("/")
+      // Por ahora, solo muestra el token y mensaje UX
+      alert("¡Bienvenido! Tu cuenta se autenticará con Google. (Integración backend pendiente)")
+      console.log("Google ID Token:", googleToken)
+    } catch (err) {
+      alert("Error al autenticar con Google. Intenta de nuevo más tarde.")
+    }
+  }
+
+  function renderGoogleButton() {
+    if (window.google && googleButton.current) {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        ux_mode: "popup"
+      })
+      window.google.accounts.id.renderButton(googleButton.current, {
+        theme: "filled",
+        size: "large",
+        shape: "pill",
+        text: "signin_with",
+        logo_alignment: "left",
+        width: 320,
+      })
     }
   }
 
   return (
     <div className="w-[360px] text-white flex flex-col items-center animate-fade-in">
-      {/* Título centrado */}
-      <h2 className="text-3xl font-semibold mb-10 text-center">
+      <h2 className="text-3xl font-semibold mb-6 text-center">
         Iniciar sesión
       </h2>
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6 w-full">
-        <div className="flex flex-col gap-2">
-          <label className="text-sm text-white/70">Correo electrónico</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="bg-transparent border-b border-white/40 py-2 focus:outline-none focus:border-red-600 transition-colors w-full"
-          />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="text-sm text-white/70">Contraseña</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="bg-transparent border-b border-white/40 py-2 focus:outline-none focus:border-red-600 transition-colors w-full"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-6 bg-red-600 text-white hover:bg-white hover:text-red-700 transition-colors duration-200 py-2 rounded-md font-semibold w-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-        >
-          {loading ? "Ingresando..." : "Ingresar"}
-        </button>
-      </form>
-
-      {/* Enlaces adicionales */}
-      <div className="flex flex-col items-center gap-2 mt-8 text-sm w-full animate-fade-in">
-        <button
-          type="button"
-          className="text-white/60 hover:text-red-400 transition-colors"
-          tabIndex={0}
-        >
-          ¿Olvidaste tu contraseña?
-        </button>
-        <div className="flex gap-1">
-          <span className="text-white/60">¿No tienes una cuenta?</span>
-          <a
-            href="/register"
-            className="text-red-500 hover:underline hover:text-red-400 transition-colors font-semibold"
-          >
-            Regístrate
-          </a>
-        </div>
+      <p className="text-base text-white/80 mb-8 text-center font-normal">
+        Accede con tu cuenta Google<br />
+        <span className="text-sm text-white/60">No necesitas registro, solo tu cuenta Google</span>
+      </p>
+      <div className="flex flex-col items-center w-full gap-6">
+        {/* Botón Google Sign-In real, sin borde ni fondo gris, redondeado */}
+        <div
+          ref={googleButton}
+          className="w-full flex justify-center items-center"
+          style={{ minHeight: 48 }}
+        />
       </div>
     </div>
   )
