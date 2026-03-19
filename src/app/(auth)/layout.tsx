@@ -1,3 +1,4 @@
+"use client";
 export default function AuthLayout({
   children,
 }: {
@@ -20,8 +21,8 @@ export default function AuthLayout({
       {/* Overlay */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-      {/* Logo */}
-      <div className="absolute top-8 left-10 z-20">
+      {/* Logo clickable */}
+      <div className="absolute top-8 left-10 z-20 cursor-pointer" onClick={() => window.location.href = "/"}>
         <h1 className="text-3xl font-extrabold tracking-wide">
           <span className="text-white/90">MIRA</span>
           <span className="text-red-600">LO</span>

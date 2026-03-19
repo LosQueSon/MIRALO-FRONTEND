@@ -76,8 +76,8 @@ export default function LoginForm() {
         {/* Botón Google Sign-In real, sin borde ni fondo gris, redondeado */}
         <div
           ref={googleButton}
-          className="w-full flex justify-center items-center"
-          style={{ minHeight: 48 }}
+          className="w-full flex justify-center items-center animate-fade-in"
+          style={{ minHeight: 48, maxWidth: 320, height: 48, width: 320 }}
         />
       </div>
     </div>
