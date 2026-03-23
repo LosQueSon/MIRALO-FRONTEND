@@ -6,8 +6,10 @@ import { AuthResponse } from "../types"
  * @returns Promise<AuthResponse>
  */
 export const authWithGoogle = async (
-  googleToken: string
+  _googleToken: string
 ): Promise<AuthResponse> => {
+  void _googleToken
+
   // TODO: Implementar llamada real al backend cuando esté disponible
   // Ejemplo:
   // const res = await fetch("/api/auth/google", {

@@ -1,20 +1,41 @@
-"use client";
-import { useRouter } from "next/navigation";
+"use client"
+
+import Link from "next/link"
 
 export default function HomePage() {
-  const router = useRouter();
-
   return (
-    <div className="w-[360px] text-white flex flex-col items-center animate-fade-in">
-      <h2 className="text-3xl font-semibold mb-6 text-center">Bienvenido a MIRA<span className="text-red-600">LO</span></h2>
-      <p className="text-base text-white/80 mb-8 text-center font-normal">Visualiza y comparte sin límites.<br /><span className="text-sm text-white/60">Accede para comenzar tu experiencia.</span></p>
-      <button
-        className="w-full min-h-[48px] rounded-full bg-red-600 text-white font-semibold text-lg shadow-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-        onClick={() => router.push("/login")}
-        style={{ maxWidth: 320, height: 48 }}
-      >
-        Iniciar sesión
-      </button>
-    </div>
-  );
+    <main className="h-screen w-screen overflow-hidden flex items-center justify-center px-6 sm:px-8 md:px-12">
+      <div className="max-w-3xl w-full space-y-8 text-center animate-fade-in">
+        {/* Título Principal */}
+        <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight leading-tight">
+          <span className="text-white">Mira con quien quieras,</span>
+          <br />
+          <span className="bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
+            donde estés
+          </span>
+        </h1>
+
+        {/* Descripción */}
+        <p className="text-lg sm:text-xl text-white/75 leading-relaxed mx-auto max-w-2xl">
+          Watchpartys sincronizadas para ver películas, series y más con tus amigos, aunque estén lejos. Sin desajustes, sin complicaciones.
+        </p>
+
+        {/* CTA Button */}
+        <div className="pt-4 flex justify-center">
+          <Link
+            href="/login"
+            className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full bg-red-600 px-6 font-semibold text-white transition-all duration-300 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/50 active:scale-95 focus:outline-none"
+          >
+            Comenzar ahora
+          </Link>
+        </div>
+
+        {/* Elementos decorativos sutiles */}
+        <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 -right-40 w-80 h-80 bg-red-600/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-1/4 -left-40 w-80 h-80 bg-red-600/5 rounded-full blur-3xl"></div>
+        </div>
+      </div>
+    </main>
+  )
 }

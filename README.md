@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Miralo Frontend
 
-## Getting Started
+Frontend de Miralo construido con Next.js (App Router), TypeScript y Tailwind CSS.
 
-First, run the development server:
+## Scripts
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run start
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Arquitectura actual
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `src/app`: capas de ruteo y composición de layouts por grupos de rutas.
+- `src/features`: módulos de dominio orientados por funcionalidad (ejemplo: auth).
+- `src/components`: componentes reutilizables transversales.
+- `src/store`: estado global de cliente con Zustand.
+- `src/types`: contratos y declaraciones globales.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Decisiones técnicas
 
-## Learn More
+- TypeScript en modo estricto (`strict: true`).
+- Enfoque de separación por feature para escalar por dominios.
+- App Router con layouts por grupos de rutas (`(app)` y `(auth)`).
+- Componente de shell visual compartido para reducir duplicación de layout.
 
-To learn more about Next.js, take a look at the following resources:
+## Estado de autenticación
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Login con Google Identity Services integrado en frontend.
+- Integración con backend de autenticación pendiente (microservicio en desarrollo).
+- Se evita exponer tokens en consola o en mensajes de depuración.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Criterios de calidad del proyecto
 
-## Deploy on Vercel
+- Mantener tipado fuerte y evitar `any` en código de dominio.
+- Evitar lógica duplicada en layouts y componentes de infraestructura.
+- Preferir navegación declarativa (`next/link`) frente a `window.location`.
+- Ejecutar `npm run lint` antes de abrir PR.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Próximos pasos recomendados
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Conectar flujo de login a backend y gestionar sesión segura.
+- Añadir pruebas unitarias para store y servicios de auth.
+- Documentar convenciones de carpetas y nombrado para nuevos features.
