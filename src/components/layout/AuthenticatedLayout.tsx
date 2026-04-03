@@ -62,7 +62,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
             onClick={() => { logout(); router.replace("/login") }}
             className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
           >
-            Logout
+            Cerrar sesión
           </button>
         </div>
       </motion.aside>
