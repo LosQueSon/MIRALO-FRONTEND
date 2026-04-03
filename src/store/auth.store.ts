@@ -4,9 +4,11 @@ import { User } from "@/features/auth/types"
 const TOKEN_STORAGE_KEY = "token"
 const USER_STORAGE_KEY = "auth_user"
 
+
 interface AuthState {
   user: User | null
   token: string | null
+  hydrated: boolean
   setAuth: (user: User, token: string) => void
   logout: () => void
   hydrateFromStorage: () => void
@@ -15,6 +17,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
+  hydrated: false,
 
   setAuth: (user, token) => {
     localStorage.setItem(TOKEN_STORAGE_KEY, token)
@@ -25,7 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY)
     localStorage.removeItem(USER_STORAGE_KEY)
-    set({ user: null, token: null })
+    set({ user: null, token: null, hydrated: true })
   },
 
   hydrateFromStorage: () => {
@@ -36,10 +39,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     const token = localStorage.getItem(TOKEN_STORAGE_KEY)
     const storedUser = localStorage.getItem(USER_STORAGE_KEY)
 
-    if (!token) {
-      return
-    }
-
     let user: User | null = null
     if (storedUser) {
       try {
@@ -49,6 +48,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     }
 
-    set({ token, user })
+    set({ token: token || null, user, hydrated: true })
   },
 }))
