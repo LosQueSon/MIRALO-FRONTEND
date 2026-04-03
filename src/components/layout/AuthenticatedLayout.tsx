@@ -38,7 +38,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: -80, opacity: 0 }}
         transition={{ type: "spring", stiffness: 120, damping: 18 }}
-        className="hidden lg:flex flex-col w-72 shrink-0 rounded-3xl border border-white/10 bg-black/60 p-5 backdrop-blur-xl mt-4 mb-4 ml-4"
+        className="hidden lg:flex flex-col w-72 shrink-0 rounded-3xl border border-white/10 bg-black/60 p-5 backdrop-blur-xl mt-4 mb-4 ml-4 mr-4"
         style={{ height: 'calc(100vh - 2rem)' }}
       >
         {/* Logo centrado */}
