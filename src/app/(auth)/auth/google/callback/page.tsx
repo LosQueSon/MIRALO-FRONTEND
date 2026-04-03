@@ -1,11 +1,14 @@
 "use client"
 
-import { useEffect } from "react"
+
+import { useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
+
 
 const gatewayBaseUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL?.replace(/\/$/, "")
 
-export default function GoogleCallbackPage() {
+
+function GoogleCallbackInner() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -33,5 +36,13 @@ export default function GoogleCallbackPage() {
         </p>
       </section>
     </main>
+  )
+}
+
+export default function GoogleCallbackPage() {
+  return (
+    <Suspense fallback={null}>
+      <GoogleCallbackInner />
+    </Suspense>
   )
 }

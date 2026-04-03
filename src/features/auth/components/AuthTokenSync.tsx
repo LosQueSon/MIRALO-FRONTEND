@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, Suspense } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { authWithGoogle } from "@/features/auth/services/auth.service"
 import { useAuthStore } from "@/store/auth.store"
 
-export default function AuthTokenSync() {
+
+function AuthTokenSyncInner() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -72,4 +73,12 @@ export default function AuthTokenSync() {
   }, [logout, pathname, router, searchParams, setAuth])
 
   return null
+}
+
+export default function AuthTokenSync() {
+  return (
+    <Suspense fallback={null}>
+      <AuthTokenSyncInner />
+    </Suspense>
+  )
 }
