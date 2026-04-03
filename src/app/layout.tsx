@@ -1,6 +1,5 @@
 import "./globals.css"
 import { Inter } from "next/font/google"
-import Header from "@/components/header/Header"
 import AuthTokenSync from "@/features/auth/components/AuthTokenSync"
 
 const inter = Inter({
@@ -16,22 +15,19 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full">
       <body className={`${inter.className} relative h-full bg-black`}>
-        {/* Video de fondo persistente */}
+        {/* Video o imagen de fondo global */}
         <video
           autoPlay
-          muted
           loop
+          muted
           playsInline
-          className="fixed inset-0 h-full w-full object-cover -z-10"
+          className="fixed inset-0 w-full h-full object-cover object-center -z-10 opacity-60"
+          poster="/assets/images/hero-poster.jpg"
         >
           <source src="/videos/background.mp4" type="video/mp4" />
         </video>
-
-        {/* Overlay oscuro persistente */}
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm -z-10" />
-
-        {/* Header fijo */}
-        <Header />
+        {/* Overlay para oscurecer */}
+        <div className="fixed inset-0 bg-black/70 -z-10" />
 
         {/* Sincroniza token de callback OAuth con el estado de auth */}
         <AuthTokenSync />
