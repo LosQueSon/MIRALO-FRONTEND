@@ -1,19 +1,6 @@
 "use client"
 import Link from "next/link"
-import { useAuthStore } from "@/store/auth.store"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-
 export default function PublicHomePage() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-  const router = useRouter()
-
-  useEffect(() => {
-    if (token) {
-      router.replace("/home")
-    }
-  }, [token, router])
-
   return (
     <main className="relative h-screen w-screen overflow-hidden flex items-center justify-center px-6 sm:px-8 md:px-12">
       {/* Header fijo */}

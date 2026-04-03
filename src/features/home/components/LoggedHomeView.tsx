@@ -24,32 +24,7 @@ export default function LoggedHomeView() {
   return (
     <main className="min-h-screen w-full px-4 pb-8 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1400px] gap-5">
-        <aside className="hidden w-64 shrink-0 rounded-3xl border border-white/10 bg-black/60 p-5 backdrop-blur-xl lg:block">
-          <h2 className="mb-6 text-3xl font-extrabold tracking-tight text-red-500">MIRALO</h2>
-          <nav className="space-y-2">
-            {navItems.map((item, index) => (
-              <button
-                key={item}
-                type="button"
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition ${index === 0 ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
-              >
-                {item}
-              </button>
-            ))}
-          </nav>
-
-          <div className="mt-10 space-y-3 border-t border-white/10 pt-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">Signed in as</p>
-            <p className="text-sm font-semibold text-white">{user?.name || user?.email || "Viewer"}</p>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-            >
-              Logout
-            </button>
-          </div>
-        </aside>
+        {/* Sidebar eliminado, ahora solo en el layout */}
 
         <section className="min-w-0 flex-1 rounded-3xl border border-white/10 bg-black/55 p-4 backdrop-blur-xl sm:p-6">
           <div className="mb-5 flex items-center justify-between gap-4">

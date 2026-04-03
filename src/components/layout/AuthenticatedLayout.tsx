@@ -26,38 +26,43 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   return (
     <div className="flex min-h-screen w-full bg-gradient-to-br from-zinc-900 via-black to-zinc-950">
-      {/* Sidebar */}
+      {/* Sidebar visual igual a LoggedHomeView */}
       <motion.aside
         initial={{ x: -80, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: -80, opacity: 0 }}
         transition={{ type: "spring", stiffness: 120, damping: 18 }}
-        className="hidden lg:flex flex-col w-72 bg-black/80 border-r border-white/10 p-6 gap-8 shadow-xl"
+        className="hidden lg:flex flex-col w-72 shrink-0 rounded-3xl border border-white/10 bg-black/60 p-5 backdrop-blur-xl m-4"
+        style={{ minHeight: 'calc(100vh - 2rem)' }}
       >
-        <div className="mb-8">
-          <h2 className="text-3xl font-extrabold tracking-tight text-red-500">MIRALO</h2>
+        {/* Logo centrado */}
+        <div className="mb-6 flex items-center justify-center">
+          <h2 className="text-3xl font-extrabold tracking-wide select-none">
+            <span className="text-white">MIRA</span><span className="text-red-600">LO</span>
+          </h2>
         </div>
-        <nav className="flex flex-col gap-2">
+        {/* Menú */}
+        <nav className="space-y-2">
           {navItems.map((item) => (
             <button
               key={item.path}
               onClick={() => router.push(item.path)}
-              className="text-left px-4 py-2 rounded-xl text-white/80 hover:bg-red-600/20 hover:text-white font-medium transition-all"
+              className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition ${pathname === item.path ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
             >
               {item.label}
             </button>
           ))}
         </nav>
-        <div className="mt-auto border-t border-white/10 pt-6">
-          <div className="mb-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">Signed in as</p>
-            <p className="text-sm font-semibold text-white">{user?.name || user?.email || "Viewer"}</p>
-          </div>
+        {/* Usuario y logout */}
+        <div className="mt-10 space-y-3 border-t border-white/10 pt-5">
+          <p className="text-xs uppercase tracking-[0.2em] text-white/45">Signed in as</p>
+          <p className="text-sm font-semibold text-white">{user?.name || user?.email || "Viewer"}</p>
           <button
+            type="button"
             onClick={() => { logout(); router.replace("/login") }}
-            className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 mt-2"
+            className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
           >
-            Cerrar sesión
+            Logout
           </button>
         </div>
       </motion.aside>
