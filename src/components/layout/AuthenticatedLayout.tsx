@@ -2,6 +2,7 @@
 import { useAuthStore } from "@/store/auth.store"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect } from "react"
+import { useAuthHydrated } from "@/features/auth/hooks/useAuthHydrated"
 import { motion, AnimatePresence } from "framer-motion"
 
 const navItems = [
@@ -17,12 +18,17 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const pathname = usePathname()
+  const hydrated = useAuthHydrated()
 
   useEffect(() => {
-    if (!user) {
+    if (hydrated && !user) {
       router.replace("/login")
     }
-  }, [user, router])
+  }, [hydrated, user, router])
+
+  if (!hydrated) {
+    return null
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-gradient-to-br from-zinc-900 via-black to-zinc-950">

@@ -1,5 +1,5 @@
-import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout"
+import ClientAppLayout from "./ClientAppLayout"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <AuthenticatedLayout>{children}</AuthenticatedLayout>
+  return <ClientAppLayout>{children}</ClientAppLayout>
 }
