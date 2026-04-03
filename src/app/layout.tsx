@@ -1,6 +1,7 @@
 import "./globals.css"
 import { Inter } from "next/font/google"
 import Header from "@/components/header/Header"
+import AuthTokenSync from "@/features/auth/components/AuthTokenSync"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,6 +32,9 @@ export default function RootLayout({
 
         {/* Header fijo */}
         <Header />
+
+        {/* Sincroniza token de callback OAuth con el estado de auth */}
+        <AuthTokenSync />
 
         {/* Contenido */}
         {children}

@@ -24,7 +24,7 @@ export default function HomePage() {
         <div className="pt-4 flex justify-center">
           <Link
             href="/login"
-            className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full bg-red-600 px-6 font-semibold text-white transition-all duration-300 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/50 active:scale-95 focus:outline-none"
+            className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full bg-red-600 px-6 font-semibold text-white transition-all duration-300 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/50 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
             Comenzar ahora
           </Link>
