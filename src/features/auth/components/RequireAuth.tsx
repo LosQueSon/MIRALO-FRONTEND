@@ -3,25 +3,24 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth.store"
+import { useAuthHydrated } from "@/features/auth/hooks/useAuthHydrated"
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const token = useAuthStore((state) => state.token)
-  const hydrateFromStorage = useAuthStore((state) => state.hydrateFromStorage)
+  const hydrated = useAuthHydrated()
 
   useEffect(() => {
-    hydrateFromStorage()
-  }, [hydrateFromStorage])
-
-  useEffect(() => {
-    if (!token) {
+    if (hydrated && !token) {
       router.replace("/login")
     }
-  }, [router, token])
+  }, [hydrated, token, router])
 
+  if (!hydrated) {
+    return null
+  }
   if (!token) {
     return null
   }
-
   return <>{children}</>
 }
