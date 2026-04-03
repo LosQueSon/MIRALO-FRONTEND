@@ -1,18 +1,24 @@
 "use client"
 import Link from "next/link"
 import { useAuthStore } from "@/store/auth.store"
+import { useAuthHydrated } from "@/hooks/useAuthHydrated"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 export default function PublicHomePage() {
   const token = useAuthStore((state) => state.token)
   const router = useRouter()
+  const hydrated = useAuthHydrated()
 
   useEffect(() => {
-    if (token) {
+    if (hydrated && token) {
       router.replace("/home")
     }
-  }, [token, router])
+  }, [hydrated, token, router])
+
+  if (!hydrated) {
+    return null // O un loader minimalista si prefieres
+  }
 
   return (
     <main className="relative h-screen w-screen overflow-hidden flex items-center justify-center px-6 sm:px-8 md:px-12">

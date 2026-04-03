@@ -4,20 +4,21 @@ import Header from "@/components/header/Header"
 import { useAuthStore } from "@/store/auth.store"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { useAuthHydrated } from "@/hooks/useAuthHydrated"
 
 export default function LoginPage() {
   const token = useAuthStore((state) => state.token)
   const router = useRouter()
+  const hydrated = useAuthHydrated()
 
   useEffect(() => {
-    if (token) {
-      // Redirección inmediata si ya está autenticado
+    if (hydrated && token) {
       router.replace("/home")
     }
-  }, [token, router])
+  }, [hydrated, token, router])
 
-  if (token) {
-    // No mostrar nada mientras redirige
+  if (!hydrated || token) {
+    // No mostrar nada mientras hidrata o redirige
     return null
   }
 
