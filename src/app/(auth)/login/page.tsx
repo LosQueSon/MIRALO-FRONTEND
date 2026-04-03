@@ -1,8 +1,26 @@
+"use client"
 import LoginForm from "@/features/auth/components/LoginForm"
 import Header from "@/components/header/Header"
-import React from "react"
+import { useAuthStore } from "@/store/auth.store"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function LoginPage() {
+  const token = useAuthStore((state) => state.token)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (token) {
+      // Redirección inmediata si ya está autenticado
+      router.replace("/home")
+    }
+  }, [token, router])
+
+  if (token) {
+    // No mostrar nada mientras redirige
+    return null
+  }
+
   return (
     <main className="relative h-screen w-screen overflow-hidden flex items-center justify-center px-6 sm:px-8 md:px-12">
       {/* Header fijo */}
