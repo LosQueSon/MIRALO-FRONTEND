@@ -11,36 +11,45 @@ npm run start
 npm run lint
 ```
 
+## Configuraci髇 local
+
+1. Variables de entorno:
+
+```bash
+cp .env.example .env.local
+```
+
+2. En local, usa el backend de auth en puerto 3001:
+
+```env
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:3001
+```
+
+3. Levanta el backend-auth y luego el frontend.
+
+## Flujo de autenticaci髇 local
+
+- El bot髇 "Continue with Google" navega a `GET /auth/google` en `NEXT_PUBLIC_API_GATEWAY_URL`.
+- Google redirige al backend-auth en `/auth/google/callback`.
+- El backend-auth redirige al frontend en `/auth/google/callback?token=...`.
+- El frontend valida el token con `GET /auth/me` y persiste la sesi髇 en Zustand + localStorage.
+
 ## Arquitectura actual
 
-- `src/app`: capas de ruteo y composici贸n de layouts por grupos de rutas.
-- `src/features`: m贸dulos de dominio orientados por funcionalidad (ejemplo: auth).
+- `src/app`: capas de ruteo y layouts por grupos de rutas.
+- `src/features`: m骴ulos por dominio (ejemplo: auth).
 - `src/components`: componentes reutilizables transversales.
 - `src/store`: estado global de cliente con Zustand.
 - `src/types`: contratos y declaraciones globales.
 
-## Decisiones t茅cnicas
+## Criterios de calidad
 
-- TypeScript en modo estricto (`strict: true`).
-- Enfoque de separaci贸n por feature para escalar por dominios.
-- App Router con layouts por grupos de rutas (`(app)` y `(auth)`).
-- Componente de shell visual compartido para reducir duplicaci贸n de layout.
-
-## Estado de autenticaci贸n
-
-- Login con Google Identity Services integrado en frontend.
-- Integraci贸n con backend de autenticaci贸n pendiente (microservicio en desarrollo).
-- Se evita exponer tokens en consola o en mensajes de depuraci贸n.
-
-## Criterios de calidad del proyecto
-
-- Mantener tipado fuerte y evitar `any` en c贸digo de dominio.
-- Evitar l贸gica duplicada en layouts y componentes de infraestructura.
-- Preferir navegaci贸n declarativa (`next/link`) frente a `window.location`.
+- Mantener tipado fuerte y evitar `any` en c骴igo de dominio.
+- Evitar l骻ica duplicada en layouts y componentes de infraestructura.
 - Ejecutar `npm run lint` antes de abrir PR.
 
-## Pr贸ximos pasos recomendados
+## Estado actual
 
-- Conectar flujo de login a backend y gestionar sesi贸n segura.
-- A帽adir pruebas unitarias para store y servicios de auth.
-- Documentar convenciones de carpetas y nombrado para nuevos features.
+- Login con Google conectado al backend-auth.
+- Manejo de token por query param y sincronizaci髇 autom醫ica de sesi髇.
+- Compatible con ejecuci髇 local sin depender de redirecciones a producci髇.

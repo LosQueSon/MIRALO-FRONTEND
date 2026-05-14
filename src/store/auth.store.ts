@@ -9,15 +9,19 @@ interface AuthState {
   user: User | null
   token: string | null
   hydrated: boolean
+  isCreateRoomModalOpen: boolean
   setAuth: (user: User, token: string) => void
   logout: () => void
   hydrateFromStorage: () => void
+  openCreateRoomModal: () => void
+  closeCreateRoomModal: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
   hydrated: false,
+  isCreateRoomModalOpen: false,
 
   setAuth: (user, token) => {
     localStorage.setItem(TOKEN_STORAGE_KEY, token)
@@ -28,7 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY)
     localStorage.removeItem(USER_STORAGE_KEY)
-    set({ user: null, token: null, hydrated: true })
+    set({ user: null, token: null, hydrated: true, isCreateRoomModalOpen: false })
   },
 
   hydrateFromStorage: () => {
@@ -48,6 +52,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     }
 
-    set({ token: token || null, user, hydrated: true })
+    set({ token: token || null, user, hydrated: true, isCreateRoomModalOpen: false })
   },
+
+  openCreateRoomModal: () => set({ isCreateRoomModalOpen: true }),
+  closeCreateRoomModal: () => set({ isCreateRoomModalOpen: false }),
 }))

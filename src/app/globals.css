@@ -16,8 +16,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050506;
+  --foreground: #f5f7fb;
+
+  --surface-1: rgba(8, 8, 12, 0.72);
+  --surface-2: rgba(12, 12, 18, 0.88);
+  --surface-border: rgba(255, 255, 255, 0.12);
+
+  --text-primary: #f5f7fb;
+  --text-secondary: rgba(245, 247, 251, 0.72);
+  --text-muted: rgba(245, 247, 251, 0.52);
+
+  --brand-primary: #dc2626;
+  --brand-primary-hover: #b91c1c;
+  --brand-accent: #22d3ee;
+
+  --state-success: #34d399;
+  --state-warning: #fbbf24;
+  --state-danger: #fb7185;
+
+  --radius-card: 24px;
+  --radius-pill: 999px;
+  --shadow-elevated: 0 24px 48px rgba(0, 0, 0, 0.32);
 }
 
 @theme inline {
@@ -38,4 +58,82 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+.ui-glass-card {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-card);
+  background: linear-gradient(140deg, var(--surface-2), var(--surface-1));
+  box-shadow: var(--shadow-elevated);
+}
+
+.ui-header-shell {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(circle at top right, rgba(220, 38, 38, 0.22), transparent 35%),
+    linear-gradient(135deg, rgba(24, 24, 27, 0.96), rgba(9, 9, 11, 0.92));
+  box-shadow: var(--shadow-elevated);
+}
+
+.ui-dot-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.ui-eyebrow {
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: var(--radius-pill);
+  background: rgba(220, 38, 38, 0.1);
+  color: #fecaca;
+}
+
+.ui-title {
+  color: var(--text-primary);
+}
+
+.ui-description {
+  color: var(--text-secondary);
+}
+
+.ui-button-primary {
+  border-radius: var(--radius-pill);
+  background: var(--brand-primary);
+  color: #ffffff;
+}
+
+.ui-button-primary:hover {
+  background: var(--brand-primary-hover);
+}
+
+.ui-button-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.ui-button-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ui-status-chip {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

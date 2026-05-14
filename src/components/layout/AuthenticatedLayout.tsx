@@ -1,24 +1,45 @@
 "use client"
 import { useAuthStore } from "@/store/auth.store"
 import { useRouter, usePathname } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAuthHydrated } from "@/features/auth/hooks/useAuthHydrated"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import CreateRoomModal from "@/components/layout/CreateRoomModal"
 
 const navItems = [
-  { label: "Home", path: "/home" },
-  { label: "Discovery", path: "/discovery" },
-  { label: "Coming Soon", path: "/coming-soon" },
-  { label: "Watch Party", path: "/watch-party" },
-  { label: "Settings", path: "/settings" },
+  { label: "Inicio", path: "/home" },
+  { label: "Mis salas", path: "/my-rooms" },
+  { label: "Crear sala", path: "create-room" },
+  { label: "Configuración", path: "/settings" },
 ]
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
+  const openCreateRoomModal = useAuthStore((state) => state.openCreateRoomModal)
+  const isCreateRoomModalOpen = useAuthStore((state) => state.isCreateRoomModalOpen)
   const pathname = usePathname()
   const hydrated = useAuthHydrated()
+  const currentPage = useMemo(() => ({ key: pathname, node: children }), [children, pathname])
+  const [displayedPage, setDisplayedPage] = useState(currentPage)
+  const [pendingPage, setPendingPage] = useState<typeof currentPage | null>(null)
+  const [phase, setPhase] = useState<"idle" | "exiting" | "entering">("idle")
+
+  useEffect(() => {
+    if (currentPage.key === displayedPage.key) {
+      if (currentPage.node !== displayedPage.node && phase === "idle") {
+        setDisplayedPage(currentPage)
+      }
+
+      return
+    }
+
+    if (phase === "idle" || pendingPage?.key !== currentPage.key) {
+      setPendingPage(currentPage)
+      setPhase("exiting")
+    }
+  }, [currentPage, displayedPage, pendingPage, phase])
 
   useEffect(() => {
     if (hydrated && !user) {
@@ -52,14 +73,29 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
           {navItems.map((item) => (
             <button
               key={item.path}
-              onClick={() => router.push(item.path)}
-              className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition ${pathname === item.path ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
+              onClick={() => {
+                if (item.path === "create-room") {
+                  openCreateRoomModal()
+                  return
+                }
+
+                router.push(item.path)
+              }}
+              className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                item.path === "/home"
+                  ? pathname === "/home"
+                    ? "bg-white/10 text-white"
+                    : "text-white/70 hover:bg-white/5 hover:text-white"
+                  : item.path === "create-room"
+                    ? isCreateRoomModalOpen
+                      ? "bg-white/10 text-white"
+                      : "text-white/70 hover:bg-white/5 hover:text-white"
+                    : pathname === item.path
+                      ? "bg-white/10 text-white"
+                      : "text-white/70 hover:bg-white/5 hover:text-white"
+              }`}
             >
-              {item.label === "Home" ? "Inicio" :
-                item.label === "Discovery" ? "Descubrir" :
-                item.label === "Coming Soon" ? "Próximamente" :
-                item.label === "Watch Party" ? "Ver en grupo" :
-                item.label === "Settings" ? "Configuración" : item.label}
+              {item.label}
             </button>
           ))}
         </nav>
@@ -77,21 +113,31 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         </div>
       </motion.aside>
       {/* Main content: solo el contenido interno es scrolleable */}
-      <main className="flex-1 flex flex-col h-full pr-4 py-4">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="flex-1 overflow-y-auto rounded-3xl border border-white/10 bg-black/55 backdrop-blur-xl"
-            style={{ minHeight: 0 }}
-          >
-            {children}
-          </motion.div>
-        </AnimatePresence>
+      <main className="relative flex-1 flex h-full flex-col pr-4 py-4 overflow-hidden">
+        <motion.div
+          key={displayedPage.key}
+          initial={phase === "entering" ? { opacity: 0, y: 14 } : false}
+          animate={phase === "exiting" ? { opacity: 0, y: -8 } : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          onAnimationComplete={() => {
+            if (phase === "exiting" && pendingPage) {
+              setDisplayedPage(pendingPage)
+              setPendingPage(null)
+              setPhase("entering")
+              return
+            }
+
+            if (phase === "entering") {
+              setPhase("idle")
+            }
+          }}
+          className="absolute inset-0 flex-1 overflow-y-auto rounded-3xl border border-white/10 bg-black/55 backdrop-blur-xl"
+          style={{ willChange: "opacity, transform" }}
+        >
+          {displayedPage.node}
+        </motion.div>
       </main>
+      <CreateRoomModal />
     </div>
   )
 }
