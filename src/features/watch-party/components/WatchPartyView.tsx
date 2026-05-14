@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { useAuthStore } from "@/store/auth.store"
+import { getReady } from "@/lib/backend/health"
 import { useYouTubePlayer } from "../hooks/useYouTubePlayer"
 
 import {
+  getUsersFavoriteGenres,
   getWatchPartyRooms,
   getWatchState,
   joinWatchPartyRoom,
@@ -20,6 +22,8 @@ import type { WatchPartyRoom, WatchState } from "../types"
 const POLLING_INTERVAL_MS = 3000
 const SOCKET_RECONNECT_DELAY_MS = 2000
 const SEEK_STEP_MS = 15000
+const READY_POLL_INTERVAL_MS = 10000
+const EMPTY_PARTICIPANTS: string[] = []
 
 type SocketStatus = "idle" | "connecting" | "connected" | "disconnected" | "error"
 type SkipDirection = "backward" | "forward"
@@ -116,6 +120,19 @@ const shortId = (value: string): string => {
   return `${value.slice(0, 5)}...${value.slice(-4)}`
 }
 
+const formatGenreLabel = (value: string | null | undefined): string => {
+  if (!value) {
+    return "Sin genero"
+  }
+
+  const normalized = value.trim()
+  if (!normalized) {
+    return "Sin genero"
+  }
+
+  return normalized[0].toUpperCase() + normalized.slice(1)
+}
+
 const toWebSocketBaseUrl = (value: string): string => {
   const trimmed = value.replace(/\/$/, "")
   if (trimmed.startsWith("https://")) {
@@ -159,15 +176,18 @@ export function WatchPartyView() {
   const [state, setState] = useState<WatchState | null>(null)
   const [sessionUserId, setSessionUserId] = useState<string>("")
   const [positionInput, setPositionInput] = useState<string>("0")
+  const [participantGenres, setParticipantGenres] = useState<Record<string, string | null>>({})
   const [lastSyncLabel, setLastSyncLabel] = useState<string>("")
   const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true)
 
   const [isLoadingRooms, setIsLoadingRooms] = useState(true)
-  const [isLoadingState, setIsLoadingState] = useState(false)
+  const [, setIsLoadingState] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLeavingRoom, setIsLeavingRoom] = useState(false)
   const [socketStatus, setSocketStatus] = useState<SocketStatus>("idle")
   const [socketRetryNonce, setSocketRetryNonce] = useState(0)
+  const [isBackendReady, setIsBackendReady] = useState(true)
+  const [isStrictRedisMode, setIsStrictRedisMode] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const socketRef = useRef<WebSocket | null>(null)
@@ -253,6 +273,7 @@ export function WatchPartyView() {
       const watchState = await getWatchState(roomId)
       setState(watchState.state)
       setPositionInput(String(Math.floor(watchState.state.positionMs / 1000)))
+      setLastSyncLabel(new Date().toLocaleTimeString("es-CO"))
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "No fue posible cargar el estado de reproduccion"
       setError(message)
@@ -260,6 +281,25 @@ export function WatchPartyView() {
       if (!background) {
         setIsLoadingState(false)
       }
+    }
+  }, [])
+
+  const loadParticipantGenres = useCallback(async (roomId: string) => {
+    if (!roomId) {
+      setParticipantGenres({})
+      return
+    }
+
+    try {
+      const genres = await getUsersFavoriteGenres(roomId)
+      const nextMap = genres.reduce<Record<string, string | null>>((accumulator, item) => {
+        accumulator[item.userId] = item.favoriteGenre
+        return accumulator
+      }, {})
+
+      setParticipantGenres(nextMap)
+    } catch {
+      setParticipantGenres({})
     }
   }, [])
 
@@ -283,6 +323,35 @@ export function WatchPartyView() {
 
     void bootstrap()
   }, [loadRooms, token])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const refreshReadyStatus = async () => {
+      const response = await getReady()
+      if (cancelled) {
+        return
+      }
+
+      if (!response) {
+        setIsBackendReady(false)
+        return
+      }
+
+      setIsBackendReady(response.status === "ready")
+      setIsStrictRedisMode(Boolean(response.strictRedis))
+    }
+
+    void refreshReadyStatus()
+    const interval = window.setInterval(() => {
+      void refreshReadyStatus()
+    }, READY_POLL_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -335,6 +404,11 @@ export function WatchPartyView() {
       return
     }
 
+    if (isPlaybackBlocked) {
+      setError("El backend no esta listo y Redis esta en modo estricto. Intenta de nuevo en unos segundos")
+      return
+    }
+
     try {
       setIsSubmitting(true)
       setError(null)
@@ -362,6 +436,7 @@ export function WatchPartyView() {
       }
 
       await loadRooms(true)
+      await loadParticipantGenres(selectedRoomId)
     } catch (actionError) {
       const message = actionError instanceof Error ? actionError.message : "No fue posible actualizar la reproduccion"
       setError(message)
@@ -415,8 +490,19 @@ export function WatchPartyView() {
 
   const parsedSeconds = Number.parseInt(positionInput, 10)
   const isValidSeconds = Number.isFinite(parsedSeconds) && parsedSeconds >= 0
-  const participants = selectedRoom?.userIds ?? []
+  const isPlaybackBlocked = !isBackendReady && isStrictRedisMode
+  const participants = selectedRoom?.userIds ?? EMPTY_PARTICIPANTS
+  const participantsKey = useMemo(() => participants.join("|"), [participants])
   const isCurrentUserInRoom = sessionUserId ? participants.includes(sessionUserId) : false
+
+  useEffect(() => {
+    if (!selectedRoomId) {
+      setParticipantGenres({})
+      return
+    }
+
+    void loadParticipantGenres(selectedRoomId)
+  }, [loadParticipantGenres, selectedRoomId, participantsKey])
 
   const closeSocket = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
@@ -540,7 +626,7 @@ export function WatchPartyView() {
         socketRef.current = null
       }
     }
-  }, [closeSocket, isCurrentUserInRoom, selectedRoomId, sessionUserId, socketRetryNonce])
+  }, [closeSocket, isCurrentUserInRoom, selectedRoomId, sessionUserId, socketRetryNonce, syncTime])
 
   const handleLeaveRoom = async () => {
     if (!selectedRoomId || !token) {
@@ -574,7 +660,13 @@ export function WatchPartyView() {
               <div className="flex items-center gap-3">
                 <span className={`inline-flex h-2 w-2 rounded-full ${socketStatus === "connected" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                 <span className="text-xs text-white/60">
-                  {socketStatus === "connected" ? "Conectado" : socketStatus === "connecting" ? "Conectando..." : "Offline"}
+                  {socketStatus === "connected"
+                    ? "Conectado (tiempo real)"
+                    : socketStatus === "connecting"
+                    ? "Conectando..."
+                    : isAutoRefreshEnabled
+                    ? "Offline — usando polling"
+                    : "Offline"}
                 </span>
                 <span className="text-xs text-white/40">• Sync: {lastSyncLabel || "—"}</span>
               </div>
@@ -645,7 +737,7 @@ export function WatchPartyView() {
                     aria-label="Retroceder 15 segundos"
                     className="h-12 w-12 rounded-full border border-red-500/40 bg-white text-red-600 backdrop-blur-sm transition hover:scale-105 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => void handleAction("seek", Math.max(0, livePlaybackMs - SEEK_STEP_MS))}
-                    disabled={!selectedRoomId || isSubmitting}
+                    disabled={!selectedRoomId || isSubmitting || isPlaybackBlocked}
                     title="Retroceder 15 segundos"
                   >
                     <span className="inline-flex h-6 w-6 items-center justify-center">
@@ -658,7 +750,7 @@ export function WatchPartyView() {
                     aria-label={state.isPlaying ? "Pausar" : "Reproducir"}
                     className="h-14 w-14 rounded-full bg-red-600 text-white shadow-[0_8px_30px_rgba(0,0,0,0.45)] transition hover:scale-105 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => void handleAction(state.isPlaying ? "pause" : "play", livePlaybackMs)}
-                    disabled={!selectedRoomId || isSubmitting}
+                    disabled={!selectedRoomId || isSubmitting || isPlaybackBlocked}
                     title={state.isPlaying ? "Pausar" : "Reproducir"}
                   >
                     <span className="inline-flex h-6 w-6 items-center justify-center">
@@ -671,7 +763,7 @@ export function WatchPartyView() {
                     aria-label="Adelantar 15 segundos"
                     className="h-12 w-12 rounded-full border border-red-500/40 bg-white text-red-600 backdrop-blur-sm transition hover:scale-105 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => void handleAction("seek", livePlaybackMs + SEEK_STEP_MS)}
-                    disabled={!selectedRoomId || isSubmitting}
+                    disabled={!selectedRoomId || isSubmitting || isPlaybackBlocked}
                     title="Adelantar 15 segundos"
                   >
                     <span className="inline-flex h-6 w-6 items-center justify-center">
@@ -686,6 +778,12 @@ export function WatchPartyView() {
           {/* Playback controls - Bottom */}
           {selectedRoom && state && (
             <div className="mt-4 space-y-3">
+              {isPlaybackBlocked ? (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                  El backend no esta listo y Redis esta en modo estricto. Controles de reproduccion bloqueados temporalmente.
+                </div>
+              ) : null}
+
               {/* Estado */}
               <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-2">
                 <div className="flex items-center gap-2">
@@ -713,7 +811,7 @@ export function WatchPartyView() {
                     type="button"
                     className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-500 border border-red-500 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => void handleAction("seek", (isValidSeconds ? parsedSeconds : 0) * 1000)}
-                    disabled={!selectedRoomId || isSubmitting || !isValidSeconds}
+                    disabled={!selectedRoomId || isSubmitting || !isValidSeconds || isPlaybackBlocked}
                   >
                     Ir a tiempo
                   </button>
@@ -753,7 +851,10 @@ export function WatchPartyView() {
                       }`}
                     >
                       <span className="w-2 h-2 rounded-full" style={{backgroundColor: participantId === sessionUserId ? "#dc2626" : "#ffffff33"}} />
-                      {participantId === sessionUserId ? "Tú" : shortId(participantId)}
+                      <div className="flex flex-col gap-0.5">
+                        <span>{participantId === sessionUserId ? "Tu" : shortId(participantId)}</span>
+                        <span className="text-[10px] text-white/50">{formatGenreLabel(participantGenres[participantId])}</span>
+                      </div>
                     </div>
                   ))
                 )}

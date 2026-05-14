@@ -1,45 +1,31 @@
 import type {
   SessionUserResponse,
-  WatchPartyError,
+  UserFavoriteGenre,
   WatchPartyRoom,
   WatchState,
   WatchStateResponse,
 } from "../types"
-
-const ensureOk = async (response: Response): Promise<Response> => {
-  if (response.ok) {
-    return response
-  }
-
-  const payload = (await response.json().catch(() => null)) as WatchPartyError | null
-  const message = payload?.message ?? `Request failed with status ${response.status}`
-  throw new Error(message)
-}
+import {
+  parseBackendPlaybackState,
+  parseBackendRoom,
+  parseBackendSessionUser,
+  parseBackendUsersGenres,
+} from "@/lib/contracts/backend"
+import { ensureOk } from "@/lib/http/api"
 
 const normalizeRoom = (input: unknown): WatchPartyRoom | null => {
-  if (!input || typeof input !== "object") {
+  const room = parseBackendRoom(input)
+  if (!room) {
     return null
   }
-
-  const source = input as Record<string, unknown>
-  const id = typeof source.id === "string" ? source.id : ""
-  if (!id) {
-    return null
-  }
-
-  const rawState = source.state
-  const state = rawState === "active" || rawState === "finished" ? rawState : "waiting"
-  const userIds = Array.isArray(source.userIds)
-    ? source.userIds.filter((item): item is string => typeof item === "string")
-    : []
 
   return {
-    id,
-    name: typeof source.name === "string" ? source.name : "Sala sin nombre",
-    state,
-    contentUrl: typeof source.contentUrl === "string" ? source.contentUrl : "",
-    userIds,
-    maxUsers: typeof source.maxUsers === "number" ? source.maxUsers : 0,
+    id: room.id,
+    name: room.name,
+    state: room.state,
+    contentUrl: room.contentUrl,
+    userIds: room.userIds,
+    maxUsers: room.maxUsers,
   }
 }
 
@@ -52,15 +38,7 @@ const parseRooms = (payload: unknown): WatchPartyRoom[] => {
 }
 
 const normalizeWatchState = (payload: unknown): WatchState => {
-  const source = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {}
-
-  return {
-    isPlaying: Boolean(source.isPlaying),
-    positionMs: typeof source.positionMs === "number" ? source.positionMs : 0,
-    updatedBy: typeof source.updatedBy === "string" ? source.updatedBy : "",
-    updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : new Date(0).toISOString(),
-    version: typeof source.version === "number" ? source.version : 0,
-  }
+  return parseBackendPlaybackState(payload)
 }
 
 export const getWatchPartyRooms = async (): Promise<WatchPartyRoom[]> => {
@@ -72,8 +50,7 @@ export const getWatchPartyRooms = async (): Promise<WatchPartyRoom[]> => {
     cache: "no-store",
   })
 
-  const okResponse = await ensureOk(response)
-  const payload = (await okResponse.json()) as unknown
+  const payload = await ensureOk(response, "No fue posible cargar las salas de watch party")
   return parseRooms(payload)
 }
 
@@ -86,8 +63,7 @@ export const getWatchState = async (roomId: string): Promise<WatchStateResponse>
     cache: "no-store",
   })
 
-  const okResponse = await ensureOk(response)
-  const payload = (await okResponse.json()) as unknown
+  const payload = await ensureOk(response, "No fue posible cargar el estado de reproduccion")
   return {
     state: normalizeWatchState(payload),
   }
@@ -108,8 +84,7 @@ export const patchWatchState = async (
     body: JSON.stringify({ action, positionMs }),
   })
 
-  const okResponse = await ensureOk(response)
-  const payload = (await okResponse.json()) as unknown
+  const payload = await ensureOk(response, "No fue posible actualizar el estado de reproduccion")
   return {
     state: normalizeWatchState(payload),
   }
@@ -124,8 +99,17 @@ export const resolveSessionUser = async (token: string): Promise<SessionUserResp
     },
   })
 
-  const okResponse = await ensureOk(response)
-  return (await okResponse.json()) as SessionUserResponse
+  const payload = await ensureOk(response, "No fue posible resolver el usuario de sesion")
+  const sessionUser = parseBackendSessionUser(payload)
+
+  if (!sessionUser) {
+    throw new Error("No se recibio un id de usuario valido")
+  }
+
+  return {
+    id: sessionUser.id,
+    name: sessionUser.name,
+  }
 }
 
 export const joinWatchPartyRoom = async (roomId: string, token: string): Promise<void> => {
@@ -137,7 +121,7 @@ export const joinWatchPartyRoom = async (roomId: string, token: string): Promise
     },
   })
 
-  await ensureOk(response)
+  await ensureOk(response, "No fue posible unirte a la sala")
 }
 
 export const leaveWatchPartyRoom = async (roomId: string, token: string): Promise<void> => {
@@ -148,5 +132,18 @@ export const leaveWatchPartyRoom = async (roomId: string, token: string): Promis
     },
   })
 
-  await ensureOk(response)
+  await ensureOk(response, "No fue posible salir de la sala")
+}
+
+export const getUsersFavoriteGenres = async (roomId: string): Promise<UserFavoriteGenre[]> => {
+  const response = await fetch(`/api/discovery/rooms/${roomId}/users/genres`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  })
+
+  const payload = await ensureOk(response, "No fue posible consultar los generos de los participantes")
+  return parseBackendUsersGenres(payload)
 }

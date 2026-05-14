@@ -28,3 +28,8 @@ export interface SessionUserResponse {
   id: string
   name: string
 }
+
+export interface UserFavoriteGenre {
+  userId: string
+  favoriteGenre: string | null
+}

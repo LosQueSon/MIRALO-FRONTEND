@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useAuthHydrated } from "@/features/auth/hooks/useAuthHydrated"
 import { motion } from "framer-motion"
 import CreateRoomModal from "@/components/layout/CreateRoomModal"
+import BackendStatusBanner from "@/components/layout/BackendStatusBanner"
 
 const navItems = [
   { label: "Inicio", path: "/home" },
@@ -114,6 +115,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       </motion.aside>
       {/* Main content: solo el contenido interno es scrolleable */}
       <main className="relative flex-1 flex h-full flex-col pr-4 py-4 overflow-hidden">
+        <BackendStatusBanner />
         <motion.div
           key={displayedPage.key}
           initial={phase === "entering" ? { opacity: 0, y: 14 } : false}

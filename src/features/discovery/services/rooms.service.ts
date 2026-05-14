@@ -3,18 +3,11 @@
   DiscoveryRoomCreatePayload,
   DiscoveryRoomsResponse,
   DiscoverySessionUser,
-  RoomState,
 } from "@/features/discovery/types"
+import { parseBackendRoom, parseBackendRooms, parseBackendSessionUser } from "@/lib/contracts/backend"
+import { ensureOk } from "@/lib/http/api"
 
 const backendBaseUrl = "/api/discovery/rooms"
-
-const ensureState = (value: unknown): RoomState => {
-  if (value === "waiting" || value === "active" || value === "finished") {
-    return value
-  }
-
-  return "waiting"
-}
 
 const toDateLabel = (value: unknown): string => {
   if (typeof value !== "string") {
@@ -36,42 +29,27 @@ const toDateLabel = (value: unknown): string => {
 }
 
 const normalizeRoom = (input: unknown): DiscoveryRoom | null => {
-  if (!input || typeof input !== "object") {
+  const room = parseBackendRoom(input)
+  if (!room) {
     return null
   }
-
-  const source = input as Record<string, unknown>
-  const id = typeof source.id === "string" ? source.id : ""
-  const name = typeof source.name === "string" ? source.name : "Sala sin nombre"
-
-  if (!id) {
-    return null
-  }
-
-  const userIds = Array.isArray(source.userIds)
-    ? source.userIds.filter((item): item is string => typeof item === "string")
-    : []
 
   return {
-    id,
-    name,
-    state: ensureState(source.state),
-    isPrivate: Boolean(source.isPrivate),
-    maxUsers: typeof source.maxUsers === "number" ? source.maxUsers : 0,
-    userCount: userIds.length,
-    userIds,
-    genres: typeof source.genres === "string" ? source.genres : "other",
-    contentUrl: typeof source.contentUrl === "string" ? source.contentUrl : "",
-    updatedAtLabel: toDateLabel(source.updatedAt),
+    id: room.id,
+    name: room.name,
+    state: room.state,
+    isPrivate: room.isPrivate,
+    maxUsers: room.maxUsers,
+    userCount: room.userIds.length,
+    userIds: room.userIds,
+    genres: room.genres,
+    contentUrl: room.contentUrl,
+    updatedAtLabel: toDateLabel(room.updatedAt),
   }
 }
 
 const parseRooms = (payload: unknown): DiscoveryRoom[] => {
-  if (!Array.isArray(payload)) {
-    return []
-  }
-
-  return payload.map(normalizeRoom).filter((room): room is DiscoveryRoom => room !== null)
+  return parseBackendRooms(payload).map(normalizeRoom).filter((room): room is DiscoveryRoom => room !== null)
 }
 
 export const getDiscoveryRooms = async (): Promise<DiscoveryRoomsResponse> => {
@@ -83,11 +61,8 @@ export const getDiscoveryRooms = async (): Promise<DiscoveryRoomsResponse> => {
     cache: "no-store",
   })
 
-  if (!response.ok) {
-    throw new Error("No fue posible consultar las salas en este momento")
-  }
-
-  return { rooms: parseRooms((await response.json()) as unknown) }
+  const payload = await ensureOk(response, "No fue posible consultar las salas en este momento")
+  return { rooms: parseRooms(payload) }
 }
 
 export const createDiscoveryRoom = async (payload: DiscoveryRoomCreatePayload): Promise<DiscoveryRoom> => {
@@ -99,12 +74,8 @@ export const createDiscoveryRoom = async (payload: DiscoveryRoomCreatePayload): 
     body: JSON.stringify(payload),
   })
 
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as { message?: string } | null
-    throw new Error(errorPayload?.message || "No fue posible crear la room")
-  }
-
-  const room = normalizeRoom((await response.json()) as unknown)
+  const responsePayload = await ensureOk(response, "No fue posible crear la room")
+  const room = normalizeRoom(responsePayload)
   if (!room) {
     throw new Error("La room fue creada pero no pudo normalizarse la respuesta")
   }
@@ -122,20 +93,14 @@ export const getDiscoverySessionUser = async (token: string): Promise<DiscoveryS
     cache: "no-store",
   })
 
-  if (!response.ok) {
-    throw new Error("No fue posible resolver el usuario de sesion")
-  }
+  const payload = await ensureOk(response, "No fue posible resolver el usuario de sesion")
+  const sessionUser = parseBackendSessionUser(payload)
 
-  const payload = (await response.json()) as Record<string, unknown>
-  const id = typeof payload.id === "string" ? payload.id : ""
-  const name = typeof payload.name === "string" ? payload.name : ""
-  const email = typeof payload.email === "string" ? payload.email : ""
-
-  if (!id) {
+  if (!sessionUser) {
     throw new Error("No se recibio un id de usuario valido")
   }
 
-  return { id, name, email }
+  return { id: sessionUser.id, name: sessionUser.name, email: sessionUser.email }
 }
 
 export const joinDiscoveryRoom = async (roomId: string, token: string, accessCode?: string): Promise<void> => {
@@ -148,10 +113,7 @@ export const joinDiscoveryRoom = async (roomId: string, token: string, accessCod
     body: JSON.stringify({ accessCode: accessCode ?? "" }),
   })
 
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null
-    throw new Error(payload?.message || "No fue posible unirse a la room")
-  }
+  await ensureOk(response, "No fue posible unirse a la room")
 }
 
 export const leaveDiscoveryRoom = async (roomId: string, token: string): Promise<void> => {
@@ -162,8 +124,5 @@ export const leaveDiscoveryRoom = async (roomId: string, token: string): Promise
     },
   })
 
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null
-    throw new Error(payload?.message || "No fue posible salir de la room")
-  }
+  await ensureOk(response, "No fue posible salir de la room")
 }
