@@ -80,6 +80,7 @@ type PlayerCommand = "play" | "pause" | "seekTo"
  */
 export function useYouTubePlayer(videoId: string | null, containerId: string) {
   const playerRef = useRef<YTPlayer | null>(null)
+    const playerReadyRef = useRef(false)
   const [state, setState] = useState<PlayerState>({
     isReady: false,
     currentTime: 0,
@@ -105,6 +106,21 @@ export function useYouTubePlayer(videoId: string | null, containerId: string) {
   // Inicializar reproductor cuando videoId cambia
   useEffect(() => {
     if (!videoId || !window.YT) {
+      // Si no hay videoId, destruir el reproductor
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy()
+        } catch {
+          // Ignorar errores al destruir
+        }
+        playerRef.current = null
+      }
+      setState({
+        isReady: false,
+        currentTime: 0,
+        isPlaying: false,
+        duration: 0,
+      })
       return
     }
 
@@ -116,26 +132,45 @@ export function useYouTubePlayer(videoId: string | null, containerId: string) {
       return
     }
 
-    playerRef.current = new window.YT.Player(containerId, {
-      videoId,
-      width: "100%",
-      height: "100%",
-      playerVars: {
-        autoplay: 0,
-        controls: 0,
-        modestbranding: 1,
-        rel: 0,
-        fs: 0,
-      },
-      events: {
-        onReady: onPlayerReady,
-        onStateChange: onPlayerStateChange,
-        onError: onPlayerError,
-      },
-    })
+    // Destruir el reproductor anterior si existe
+    if (playerRef.current) {
+      try {
+        playerRef.current.destroy()
+      } catch {
+        // Ignorar errores al destruir el reproductor anterior
+      }
+    }
+
+    // Crear nuevo reproductor
+    try {
+      playerRef.current = new window.YT.Player(containerId, {
+        videoId,
+        width: "100%",
+        height: "100%",
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          fs: 0,
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange,
+          onError: onPlayerError,
+        },
+      })
+    } catch (error) {
+      console.error("[YouTube Player] Error creando reproductor:", error instanceof Error ? error.message : "Desconocido")
+      setState((prev) => ({
+        ...prev,
+        isReady: false,
+      }))
+    }
   }, [videoId, containerId])
 
   const onPlayerReady = () => {
+      playerReadyRef.current = true
     setState((prev) => ({
       ...prev,
       isReady: true,
@@ -153,6 +188,7 @@ export function useYouTubePlayer(videoId: string | null, containerId: string) {
   }
 
   const onPlayerError = () => {
+      playerReadyRef.current = false
     setState((prev) => ({
       ...prev,
       isReady: false,
@@ -182,27 +218,36 @@ export function useYouTubePlayer(videoId: string | null, containerId: string) {
 
   // Sincronizar tiempo cuando llega del backend
   const syncTime = useCallback((positionMs: number, shouldPlay: boolean) => {
-    if (!playerRef.current || !state.isReady) {
+    if (!playerRef.current || !playerReadyRef.current) {
       return
     }
 
-    const targetSeconds = Math.floor(positionMs / 1000)
-    const currentSeconds = Math.floor(playerRef.current.getCurrentTime())
+    try {
+      if (typeof playerRef.current.getCurrentTime !== "function") {
+        return
+      }
 
-    // Solo seekear si hay diferencia significativa (más de 2 segundos)
-    if (Math.abs(targetSeconds - currentSeconds) > 2) {
-      playerRef.current.seekTo(targetSeconds, true)
+      const targetSeconds = Math.floor(positionMs / 1000)
+      const currentSeconds = Math.floor(playerRef.current.getCurrentTime())
+
+      // Solo seekear si hay diferencia significativa (más de 2 segundos)
+      if (Math.abs(targetSeconds - currentSeconds) > 2) {
+        playerRef.current.seekTo(targetSeconds, true)
+      }
+
+      // Sincronizar estado de reproducción
+      const isCurrentlyPlaying = playerRef.current.getPlayerState() === YT_PLAYER_STATE.PLAYING
+
+      if (shouldPlay && !isCurrentlyPlaying) {
+        playerRef.current.playVideo()
+      } else if (!shouldPlay && isCurrentlyPlaying) {
+        playerRef.current.pauseVideo()
+      }
+    } catch {
+      // Silenciosamente ignorar errores si el reproductor no está completamente listo
+      return
     }
-
-    // Sincronizar estado de reproducción
-    const isCurrentlyPlaying = playerRef.current.getPlayerState() === YT_PLAYER_STATE.PLAYING
-
-    if (shouldPlay && !isCurrentlyPlaying) {
-      playerRef.current.playVideo()
-    } else if (!shouldPlay && isCurrentlyPlaying) {
-      playerRef.current.pauseVideo()
-    }
-  }, [state.isReady])
+  }, [])
 
   // Mientras el video esta reproduciendo, refresca el tiempo local para
   // que las acciones play/pause envien una posicion precisa al backend.

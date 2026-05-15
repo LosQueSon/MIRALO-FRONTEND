@@ -18,6 +18,7 @@ export interface BackendRoom {
   name: string
   state: BackendRoomState
   isPrivate: boolean
+  accessCode: string
   maxUsers: number
   hostId: string
   userIds: string[]
@@ -81,6 +82,7 @@ export const parseBackendRoom = (input: unknown): BackendRoom | null => {
     name: typeof input.name === "string" ? input.name : "Sala sin nombre",
     state: parseRoomState(input.state),
     isPrivate: Boolean(input.isPrivate),
+    accessCode: typeof input.accessCode === "string" ? input.accessCode : "",
     maxUsers: typeof input.maxUsers === "number" ? input.maxUsers : 0,
     hostId: typeof input.hostId === "string" ? input.hostId : "",
     userIds,

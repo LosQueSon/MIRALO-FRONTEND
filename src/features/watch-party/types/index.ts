@@ -5,6 +5,10 @@ export interface WatchPartyRoom {
   contentUrl: string
   userIds: string[]
   maxUsers: number
+  hostId: string
+  isPrivate?: boolean
+  accessCode?: string
+  genres?: string
 }
 
 export interface WatchState {

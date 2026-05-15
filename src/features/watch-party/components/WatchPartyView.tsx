@@ -17,8 +17,10 @@ import {
   leaveWatchPartyRoom,
   patchWatchState,
   resolveSessionUser,
+  deleteRoom,
 } from "../services/watch-party.service"
 import { RoomChatPanel } from "./RoomChatPanel"
+import DeleteRoomModal from "./DeleteRoomModal"
 import type { WatchPartyRoom, WatchState } from "../types"
 
 const POLLING_INTERVAL_MS = 3000
@@ -191,6 +193,8 @@ export function WatchPartyView() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLeavingRoom, setIsLeavingRoom] = useState(false)
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false)
   const [socketStatus, setSocketStatus] = useState<SocketStatus>("idle")
   const [socketRetryNonce, setSocketRetryNonce] = useState(0)
   const [isBackendReady, setIsBackendReady] = useState(true)
@@ -200,6 +204,7 @@ export function WatchPartyView() {
   const socketRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<number | null>(null)
   const overlayHideTimerRef = useRef<number | null>(null)
+  const isTransitioningRoomRef = useRef(false)
   const [areOverlayControlsVisible, setAreOverlayControlsVisible] = useState(true)
 
   // Hook de YouTube Player - gestiona el reproductor sin conocer el estado global
@@ -425,10 +430,10 @@ export function WatchPartyView() {
       const canUseSocket = socketRef.current?.readyState === WebSocket.OPEN
 
       if (canUseSocket) {
-        console.log("📤 [WebSocket Watch Party] Enviando acción por socket:", action, "positionMs:", positionMs)
+        console.log("[WebSocket Watch Party] Enviando acción por socket:", action, "positionMs:", positionMs)
         socketRef.current?.send(JSON.stringify({ event: action, positionMs }))
       } else {
-        console.log("🔴 [WebSocket Watch Party] Socket no disponible, usando API REST:", action)
+        console.log("[WebSocket Watch Party] Socket no disponible, usando API REST:", action)
         const updated = await patchWatchState(selectedRoomId, action, positionMs, token)
         setState(updated.state)
         setPositionInput(String(Math.floor(updated.state.positionMs / 1000)))
@@ -597,26 +602,27 @@ export function WatchPartyView() {
     )
     const endpoint = `${baseUrl}/ws/rooms/${encodeURIComponent(selectedRoomId)}/watch?userId=${encodeURIComponent(sessionUserId)}`
 
-    console.log("🔌 [WebSocket Watch Party] Conectando a:", endpoint)
+    console.log("[WebSocket Watch Party] Conectando a:", endpoint)
     setSocketStatus("connecting")
     const socket = new WebSocket(endpoint)
     socketRef.current = socket
 
     let cancelled = false
+    const currentRoomId = selectedRoomId
 
     socket.onopen = () => {
       if (cancelled) {
         return
       }
 
-      console.log("✅ [WebSocket Watch Party] Conectado exitosamente")
+      console.log("[WebSocket Watch Party] Conectado exitosamente")
       setSocketStatus("connected")
       socket.send(JSON.stringify({ event: "get_state" }))
-      console.log("📤 [WebSocket Watch Party] Enviado: get_state")
+      console.log("[WebSocket Watch Party] Enviado: get_state")
     }
 
     socket.onmessage = (event) => {
-      if (cancelled) {
+      if (cancelled || currentRoomId !== selectedRoomId || isTransitioningRoomRef.current) {
         return
       }
 
@@ -627,10 +633,8 @@ export function WatchPartyView() {
           data?: unknown
         }
 
-        console.log("📥 [WebSocket Watch Party] Mensaje recibido:", payload.event, payload.data)
-
         if (payload.event === "error") {
-          console.error("❌ [WebSocket Watch Party] Error del servidor:", payload.message)
+          console.error("[WebSocket Watch Party] Error del servidor:", payload.message)
           setError(payload.message ?? "Error en el canal de tiempo real")
           return
         }
@@ -638,11 +642,11 @@ export function WatchPartyView() {
         if (payload.event === "connected" || payload.event === "watch_state") {
           const socketState = parseSocketState(payload.data)
           if (!socketState) {
-            console.warn("⚠️ [WebSocket Watch Party] No se pudo parsear el estado")
+            console.warn("[WebSocket Watch Party] No se pudo parsear el estado")
             return
           }
 
-          console.log("🎬 [WebSocket Watch Party] Estado sincronizado:", socketState)
+          console.log("[WebSocket Watch Party] Estado sincronizado:", socketState)
           setState(socketState)
           setPositionInput(String(Math.floor(socketState.positionMs / 1000)))
           setLastSyncLabel(new Date().toLocaleTimeString("es-CO"))
@@ -650,9 +654,8 @@ export function WatchPartyView() {
           // Sincronizar el reproductor con el estado del backend
           syncTime(socketState.positionMs, socketState.isPlaying)
         }
-      } catch {
-        console.error("❌ [WebSocket Watch Party] Error procesando mensaje")
-        setError("No fue posible procesar un mensaje de tiempo real")
+      } catch (error) {
+        console.error("[WebSocket Watch Party] Error procesando mensaje:", error instanceof Error ? error.message : "Desconocido")
       }
     }
 
@@ -661,7 +664,7 @@ export function WatchPartyView() {
         return
       }
 
-      console.error("❌ [WebSocket Watch Party] Error en el socket")
+      console.error("[WebSocket Watch Party] Error en el socket")
       setSocketStatus("error")
     }
 
@@ -670,7 +673,7 @@ export function WatchPartyView() {
         return
       }
 
-      console.log("🔌 [WebSocket Watch Party] Desconectado - Reintentando en", SOCKET_RECONNECT_DELAY_MS, "ms")
+      console.log("[WebSocket Watch Party] Desconectado - Reintentando en", SOCKET_RECONNECT_DELAY_MS, "ms")
       setSocketStatus("disconnected")
       reconnectTimerRef.current = window.setTimeout(() => {
         setSocketRetryNonce((value) => value + 1)
@@ -721,6 +724,28 @@ export function WatchPartyView() {
     }
   }
 
+  const handleDeleteRoom = async () => {
+    if (!selectedRoomId || !token) {
+      throw new Error("No hay sala seleccionada o sesion activa")
+    }
+
+    try {
+      setIsDeletingRoom(true)
+      setError(null)
+      await deleteRoom(selectedRoomId, token)
+      closeSocket()
+      await loadRooms(true)
+      setIsDeleteModalOpen(false)
+      router.push("/my-rooms")
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : "No fue posible eliminar la sala"
+      setError(message)
+      throw deleteError
+    } finally {
+      setIsDeletingRoom(false)
+    }
+  }
+
   useEffect(() => {
     const handleLeaveRequest = (event: Event) => {
       const customEvent = event as CustomEvent<{ targetPath?: string }>
@@ -766,6 +791,19 @@ export function WatchPartyView() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            {selectedRoom && sessionUserId === selectedRoom.hostId && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  disabled={!selectedRoomId || isDeletingRoom}
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-red-600/30 bg-red-600/10 px-4 text-sm font-semibold text-red-400 transition hover:bg-red-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Eliminar sala"
+                >
+                  Eliminar
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => setIsLeaveModalOpen(true)}
@@ -981,6 +1019,15 @@ export function WatchPartyView() {
           </div>
         </div>
       </div>
+
+      {/* Delete Room Modal */}
+      <DeleteRoomModal
+        isOpen={isDeleteModalOpen}
+        roomName={selectedRoom?.name ?? "Sala"}
+        isSubmitting={isDeletingRoom}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteRoom}
+      />
     </div>
   )
 }

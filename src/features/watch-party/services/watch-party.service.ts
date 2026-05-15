@@ -27,6 +27,10 @@ const normalizeRoom = (input: unknown): WatchPartyRoom | null => {
     contentUrl: room.contentUrl,
     userIds: room.userIds,
     maxUsers: room.maxUsers,
+    hostId: room.hostId,
+    isPrivate: room.isPrivate,
+    accessCode: room.accessCode,
+    genres: room.genres,
   }
 }
 
@@ -149,4 +153,16 @@ export const getUsersFavoriteGenres = async (roomId: string): Promise<UserFavori
 
   const payload = await ensureOk(response, "No fue posible consultar los generos de los participantes")
   return parseBackendUsersGenres(payload)
+}
+
+export const deleteRoom = async (roomId: string, token: string): Promise<void> => {
+  const response = await fetch(`/api/watch-party/rooms/${roomId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  await ensureOk(response, "No fue posible eliminar la sala")
+  notifyRoomsUpdated()
 }
