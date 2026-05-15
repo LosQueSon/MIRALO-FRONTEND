@@ -2,8 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import ConfirmLeaveModal from "@/components/layout/ConfirmLeaveModal"
 import { useAuthStore } from "@/store/auth.store"
 import FeaturePageShell from "@/components/layout/FeaturePageShell"
+import { notifyRoomsUpdated, ROOMS_UPDATED_EVENT, ROOMS_UPDATED_STORAGE_KEY } from "@/lib/rooms-sync"
 import {
   createDiscoveryRoom,
   getDiscoveryRooms,
@@ -128,6 +130,7 @@ export default function DiscoveryRoomsView() {
   const [formState, setFormState] = useState(defaultForm)
   const [isCreating, setIsCreating] = useState(false)
   const [actionRoomId, setActionRoomId] = useState<string>("")
+  const [confirmLeaveRoomId, setConfirmLeaveRoomId] = useState<string>("")
   const [createMessage, setCreateMessage] = useState<string>("")
   const [createError, setCreateError] = useState<string>("")
   const [backendUserId, setBackendUserId] = useState<string>("")
@@ -162,6 +165,39 @@ export default function DiscoveryRoomsView() {
 
   useEffect(() => {
     void refreshRooms()
+  }, [])
+
+  useEffect(() => {
+    const handleRoomsUpdated = () => {
+      void refreshRooms({ background: true })
+    }
+
+    const handleStorageUpdate = (event: StorageEvent) => {
+      if (event.key === ROOMS_UPDATED_STORAGE_KEY) {
+        void refreshRooms({ background: true })
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshRooms({ background: true })
+      }
+    }
+
+    window.addEventListener(ROOMS_UPDATED_EVENT, handleRoomsUpdated)
+    window.addEventListener("storage", handleStorageUpdate)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    const intervalId = window.setInterval(() => {
+      void refreshRooms({ background: true })
+    }, 15000)
+
+    return () => {
+      window.removeEventListener(ROOMS_UPDATED_EVENT, handleRoomsUpdated)
+      window.removeEventListener("storage", handleStorageUpdate)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.clearInterval(intervalId)
+    }
   }, [])
 
   useEffect(() => {
@@ -235,6 +271,11 @@ export default function DiscoveryRoomsView() {
     }
   }
 
+  const handleConfirmLeave = async (roomId: string) => {
+    setConfirmLeaveRoomId("")
+    await handleLeaveRoom(roomId)
+  }
+
   const handleCreateRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -248,7 +289,7 @@ export default function DiscoveryRoomsView() {
     setCreateMessage("")
 
     try {
-      await createDiscoveryRoom({
+      const created = await createDiscoveryRoom({
         name: formState.name.trim(),
         contentUrl: formState.contentUrl.trim(),
         genres: formState.genres,
@@ -260,7 +301,10 @@ export default function DiscoveryRoomsView() {
       setCreateMessage("Room creada correctamente")
       setFormState(defaultForm)
       setIsCreateModalOpen(false)
+      notifyRoomsUpdated()
       await refreshRooms({ background: true })
+      // Redirect to the created room immediately
+      router.push(`/watch-party?roomId=${encodeURIComponent(created.id)}`)
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : "No se pudo crear la room")
     } finally {
@@ -269,7 +313,8 @@ export default function DiscoveryRoomsView() {
   }
 
   return (
-    <FeaturePageShell
+    <>
+      <FeaturePageShell
       title="Crea y explora rooms"
       description="Empieza a montar watch parties reales desde aqui. Crea una room con tu link de YouTube, revisa las salas disponibles y prepara el flujo para integraciones futuras sin salir del layout actual."
     >
@@ -412,7 +457,7 @@ export default function DiscoveryRoomsView() {
                             type="button"
                             disabled={actionRoomId === room.id}
                             onClick={() => {
-                              void handleLeaveRoom(room.id)
+                              setConfirmLeaveRoomId(room.id)
                             }}
                             className="inline-flex h-10 items-center justify-center rounded-full border border-white/20 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
                           >
@@ -567,5 +612,15 @@ export default function DiscoveryRoomsView() {
         ) : null}
       </section>
     </FeaturePageShell>
+    <ConfirmLeaveModal
+      isOpen={confirmLeaveRoomId !== ""}
+      title="Salir de la sala"
+      message="Vas a salir de la sala. ¿Estás seguro?"
+      confirmLabel="Salir"
+      cancelLabel="Cancelar"
+      onConfirm={() => void handleConfirmLeave(confirmLeaveRoomId)}
+      onCancel={() => setConfirmLeaveRoomId("")}
+    />
+    </>
   )
 }

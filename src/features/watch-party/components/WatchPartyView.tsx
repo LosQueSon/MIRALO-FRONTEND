@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import ConfirmLeaveModal from "@/components/layout/ConfirmLeaveModal"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { useAuthStore } from "@/store/auth.store"
@@ -177,6 +178,10 @@ export function WatchPartyView() {
   const [sessionUserId, setSessionUserId] = useState<string>("")
   const [positionInput, setPositionInput] = useState<string>("0")
   const [participantGenres, setParticipantGenres] = useState<Record<string, string | null>>({})
+  // userNames stores resolved display names; if a user has no name we store a fallback (shortId)
+  const [userNames, setUserNames] = useState<Record<string, string>>({})
+  const [isLoadingNames, setIsLoadingNames] = useState<boolean>(false)
+  const fetchingRef = useRef<Set<string>>(new Set())
   const [lastSyncLabel, setLastSyncLabel] = useState<string>("")
   const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true)
 
@@ -184,6 +189,7 @@ export function WatchPartyView() {
   const [, setIsLoadingState] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLeavingRoom, setIsLeavingRoom] = useState(false)
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
   const [socketStatus, setSocketStatus] = useState<SocketStatus>("idle")
   const [socketRetryNonce, setSocketRetryNonce] = useState(0)
   const [isBackendReady, setIsBackendReady] = useState(true)
@@ -315,6 +321,7 @@ export function WatchPartyView() {
       try {
         const sessionUser = await resolveSessionUser(token)
         setSessionUserId(sessionUser.id)
+        setUserNames((prev) => ({ ...prev, [sessionUser.id]: sessionUser.name }))
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : "No fue posible resolver el usuario"
         setError(message)
@@ -504,6 +511,61 @@ export function WatchPartyView() {
     void loadParticipantGenres(selectedRoomId)
   }, [loadParticipantGenres, selectedRoomId, participantsKey])
 
+  // Fetch participant display names (id -> name) so UI can show usernames instead of ids
+  useEffect(() => {
+    if (!selectedRoomId) return
+
+    const missing = participants.filter((id) => !(id in userNames) && !fetchingRef.current.has(id))
+    if (missing.length === 0) {
+      setIsLoadingNames(false)
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingNames(true)
+
+    const fetchBatch = async () => {
+      try {
+        // mark in-flight
+        for (const id of missing) fetchingRef.current.add(id)
+
+        const results = await Promise.all(
+          missing.map(async (id) => {
+            try {
+              const response = await fetch(`/api/discovery/users/${encodeURIComponent(id)}`)
+              if (!response.ok) {
+                return { id, name: shortId(id) }
+              }
+              const payload = await response.json().catch(() => null)
+              return { id, name: payload && typeof payload.name === "string" && payload.name.trim() ? payload.name : shortId(id) }
+            } catch {
+              return { id, name: shortId(id) }
+            }
+          }),
+        )
+
+        if (cancelled) return
+
+        setUserNames((prev) => {
+          const next = { ...prev }
+          for (const r of results) {
+            next[r.id] = r.name
+            fetchingRef.current.delete(r.id)
+          }
+          return next
+        })
+      } finally {
+        if (!cancelled) setIsLoadingNames(false)
+      }
+    }
+
+    void fetchBatch()
+
+    return () => {
+      cancelled = true
+    }
+  }, [participantsKey, selectedRoomId])
+
   const closeSocket = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
       window.clearTimeout(reconnectTimerRef.current)
@@ -631,15 +693,24 @@ export function WatchPartyView() {
   const handleLeaveRoom = async () => {
     if (!selectedRoomId || !token) {
       setError("No hay sala seleccionada o sesion activa")
+      setIsLeaveModalOpen(false)
       return
     }
 
     try {
       setIsLeavingRoom(true)
       setError(null)
+      // Immediately update UI to remove current user from participants for instant feedback
+      setUserNames((prev) => {
+        const next = { ...prev }
+        delete next[sessionUserId]
+        return next
+      })
+      // call backend to leave
       await leaveWatchPartyRoom(selectedRoomId, token)
       closeSocket()
       await loadRooms(true)
+      setIsLeaveModalOpen(false)
       router.push("/discovery")
     } catch (leaveError) {
       const message = leaveError instanceof Error ? leaveError.message : "No fue posible salir de la room"
@@ -690,7 +761,7 @@ export function WatchPartyView() {
             </button>
             <button
               type="button"
-              onClick={() => void handleLeaveRoom()}
+              onClick={() => setIsLeaveModalOpen(true)}
               disabled={!selectedRoomId || isLeavingRoom}
               className="h-9 px-4 rounded-lg bg-red-600 text-xs font-semibold text-white hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -699,6 +770,17 @@ export function WatchPartyView() {
           </div>
         </div>
       </div>
+
+      {/* Leave confirmation modal */}
+      <ConfirmLeaveModal
+        isOpen={isLeaveModalOpen}
+        title="Salir de la sala"
+        message="Vas a salir de la sala. ¿Estás seguro?"
+        confirmLabel="Salir"
+        cancelLabel="Cancelar"
+        onConfirm={() => void handleLeaveRoom()}
+        onCancel={() => setIsLeaveModalOpen(false)}
+      />
 
       {/* Main content area */}
       <div className="flex-1 overflow-hidden flex gap-6 p-6">
@@ -840,6 +922,24 @@ export function WatchPartyView() {
               <div className="space-y-2 flex-1 overflow-y-auto">
                 {participants.length === 0 ? (
                   <span className="text-xs text-white/50">Sin participantes</span>
+                ) : isLoadingNames ? (
+                  // show skeleton placeholders while resolving names to avoid flash
+                  participants.map((participantId) => (
+                    <div
+                      key={participantId}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+                        participantId === sessionUserId
+                          ? "bg-red-600/20 border border-red-500/50 text-red-200"
+                          : "bg-white/5 border border-white/10 text-white/70"
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full opacity-30" style={{ backgroundColor: participantId === sessionUserId ? "#dc2626" : "#ffffff33" }} />
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="h-3 w-32 rounded bg-white/10 animate-pulse" />
+                        <div className="h-3 w-20 rounded bg-white/6 mt-1" />
+                      </div>
+                    </div>
+                  ))
                 ) : (
                   participants.map((participantId) => (
                     <div
@@ -852,7 +952,7 @@ export function WatchPartyView() {
                     >
                       <span className="w-2 h-2 rounded-full" style={{backgroundColor: participantId === sessionUserId ? "#dc2626" : "#ffffff33"}} />
                       <div className="flex flex-col gap-0.5">
-                        <span>{participantId === sessionUserId ? "Tu" : shortId(participantId)}</span>
+                        <span>{participantId === sessionUserId ? "Tu" : (userNames[participantId] ?? shortId(participantId))}</span>
                         <span className="text-[10px] text-white/50">{formatGenreLabel(participantGenres[participantId])}</span>
                       </div>
                     </div>
@@ -868,6 +968,7 @@ export function WatchPartyView() {
               roomId={selectedRoomId}
               roomName={selectedRoom?.name ?? "Sala"}
               userId={sessionUserId}
+              userNames={userNames}
               isActive={Boolean(selectedRoomId && isCurrentUserInRoom)}
             />
           </div>

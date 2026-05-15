@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth.store"
 import FeaturePageShell from "@/components/layout/FeaturePageShell"
+import { ROOMS_UPDATED_EVENT, ROOMS_UPDATED_STORAGE_KEY } from "@/lib/rooms-sync"
 import {
   createDiscoveryRoom,
   getDiscoveryRooms,
@@ -177,6 +178,39 @@ export default function LoggedHomeView() {
 
   useEffect(() => {
     void refreshRooms()
+  }, [])
+
+  useEffect(() => {
+    const handleRoomsUpdated = () => {
+      void refreshRooms({ background: true })
+    }
+
+    const handleStorageUpdate = (event: StorageEvent) => {
+      if (event.key === ROOMS_UPDATED_STORAGE_KEY) {
+        void refreshRooms({ background: true })
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshRooms({ background: true })
+      }
+    }
+
+    window.addEventListener(ROOMS_UPDATED_EVENT, handleRoomsUpdated)
+    window.addEventListener("storage", handleStorageUpdate)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    const intervalId = window.setInterval(() => {
+      void refreshRooms({ background: true })
+    }, 15000)
+
+    return () => {
+      window.removeEventListener(ROOMS_UPDATED_EVENT, handleRoomsUpdated)
+      window.removeEventListener("storage", handleStorageUpdate)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.clearInterval(intervalId)
+    }
   }, [])
 
   useEffect(() => {

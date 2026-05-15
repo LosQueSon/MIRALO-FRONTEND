@@ -53,14 +53,14 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   }
 
   return (
-    <div className="flex h-screen w-full bg-gradient-to-br from-zinc-900 via-black to-zinc-950 overflow-hidden">
+    <div className="flex h-screen w-full bg-gradient-to-br from-zinc-900 via-black to-zinc-950 overflow-hidden gap-4 p-4">
       {/* Sidebar visual igual a LoggedHomeView */}
       <motion.aside
         initial={{ x: -80, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: -80, opacity: 0 }}
         transition={{ type: "spring", stiffness: 120, damping: 18 }}
-        className="hidden lg:flex flex-col w-72 shrink-0 rounded-3xl border border-white/10 bg-black/60 p-5 backdrop-blur-xl mt-4 mb-4 ml-4 mr-4"
+        className="hidden lg:flex flex-col w-72 shrink-0 rounded-3xl border border-white/10 bg-black/60 p-5 backdrop-blur-xl"
         style={{ height: 'calc(100vh - 2rem)' }}
       >
         {/* Logo centrado */}
@@ -114,8 +114,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         </div>
       </motion.aside>
       {/* Main content: solo el contenido interno es scrolleable */}
-      <main className="relative flex-1 flex h-full flex-col pr-4 py-4 overflow-hidden">
-        <BackendStatusBanner />
+      <main className="flex-1 flex h-full flex-col overflow-hidden" style={{ height: 'calc(100vh - 2rem)' }}>
+        {/* BackendStatusBanner renderizado como toast flotante en document.body */}
         <motion.div
           key={displayedPage.key}
           initial={phase === "entering" ? { opacity: 0, y: 14 } : false}
@@ -133,7 +133,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
               setPhase("idle")
             }
           }}
-          className="absolute inset-0 flex-1 overflow-y-auto rounded-3xl border border-white/10 bg-black/55 backdrop-blur-xl"
+          className="flex-1 overflow-y-auto rounded-3xl border border-white/10 bg-black/55 backdrop-blur-xl"
           style={{ willChange: "opacity, transform" }}
         >
           {displayedPage.node}

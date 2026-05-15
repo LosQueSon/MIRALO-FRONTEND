@@ -1,9 +1,11 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth.store"
 import { createDiscoveryRoom } from "@/features/discovery/services/rooms.service"
+import { notifyRoomsUpdated } from "@/lib/rooms-sync"
 
 const genreOptions = [
   { value: "action", label: "Accion" },
@@ -36,6 +38,11 @@ export default function CreateRoomModal() {
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [formState, setFormState] = useState(defaultForm)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleClose = () => {
     setMessage("")
@@ -57,7 +64,7 @@ export default function CreateRoomModal() {
     setMessage("")
 
     try {
-      await createDiscoveryRoom({
+      const created = await createDiscoveryRoom({
         name: formState.name.trim(),
         contentUrl: formState.contentUrl.trim(),
         genres: formState.genres,
@@ -66,10 +73,11 @@ export default function CreateRoomModal() {
         accessCode: formState.isPrivate ? formState.accessCode.trim() : "",
       })
 
-      window.dispatchEvent(new Event("miralo:rooms-updated"))
+      notifyRoomsUpdated()
       setMessage("Sala creada correctamente")
       handleClose()
-      router.refresh()
+      // redirect to the created room immediately
+      router.push(`/watch-party?roomId=${encodeURIComponent(created.id)}`)
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "No se pudo crear la sala")
     } finally {
@@ -77,11 +85,11 @@ export default function CreateRoomModal() {
     }
   }
 
-  if (!isOpen) {
+  if (!isOpen || !mounted) {
     return null
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-[28px] border border-white/10 bg-[#0b0b0d] p-5 shadow-2xl shadow-black/40 sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -200,6 +208,7 @@ export default function CreateRoomModal() {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

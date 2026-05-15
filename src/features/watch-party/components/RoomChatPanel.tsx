@@ -40,9 +40,10 @@ interface RoomChatPanelProps {
   roomName: string
   userId: string
   isActive: boolean
+  userNames?: Record<string, string>
 }
 
-export function RoomChatPanel({ roomId, roomName, userId, isActive }: RoomChatPanelProps) {
+export function RoomChatPanel({ roomId, roomName, userId, isActive, userNames }: RoomChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState("")
   const [status, setStatus] = useState<ChatSocketStatus>("idle")
@@ -181,10 +182,7 @@ export function RoomChatPanel({ roomId, roomName, userId, isActive }: RoomChatPa
     setDraft("")
   }
 
-  const groupedMessages = useMemo(
-    () => messages,
-    [messages],
-  )
+  const groupedMessages = useMemo(() => messages, [messages])
 
   return (
     <section className="flex flex-col h-full">
@@ -222,10 +220,7 @@ export function RoomChatPanel({ roomId, roomName, userId, isActive }: RoomChatPa
                   const isOwnMessage = message.userId === userId
 
                   return (
-                    <article
-                      key={message.id}
-                      className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
-                    >
+                    <article key={message.id} className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}>
                       <div
                         className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs ${
                           isOwnMessage
@@ -234,7 +229,7 @@ export function RoomChatPanel({ roomId, roomName, userId, isActive }: RoomChatPa
                         }`}
                       >
                         <div className="flex items-center justify-between gap-1 mb-0.5 text-[9px] uppercase tracking-wider text-white/50 font-medium">
-                          <span>{isOwnMessage ? "Tú" : shortId(message.userId)}</span>
+                          <span>{isOwnMessage ? "Tú" : (userNames && userNames[message.userId]) || shortId(message.userId)}</span>
                           <span className="text-white/30">{formatTimestamp(message.timestamp)}</span>
                         </div>
                         <p className="whitespace-pre-wrap break-words leading-4">{message.content}</p>
