@@ -1,5 +1,10 @@
+import { Suspense } from "react"
 import ClientAppLayout from "./ClientAppLayout"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <ClientAppLayout>{children}</ClientAppLayout>
+  return (
+    <Suspense fallback={null}>
+      <ClientAppLayout>{children}</ClientAppLayout>
+    </Suspense>
+  )
 }

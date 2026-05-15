@@ -1,4 +1,5 @@
 import "./globals.css"
+import { Suspense } from "react"
 import { Inter } from "next/font/google"
 import AuthTokenSync from "@/features/auth/components/AuthTokenSync"
 
@@ -30,7 +31,9 @@ export default function RootLayout({
         <div className="fixed inset-0 bg-black/70 -z-10" />
 
         {/* Sincroniza token de callback OAuth con el estado de auth */}
-        <AuthTokenSync />
+        <Suspense fallback={null}>
+          <AuthTokenSync />
+        </Suspense>
 
         {/* Contenido */}
         {children}
