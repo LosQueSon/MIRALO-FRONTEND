@@ -53,6 +53,7 @@ const getThumbnailUrl = (contentUrl: string): string => {
 export default function MyRoomsView() {
   const router = useRouter()
   const token = useAuthStore((state) => state.token)
+  const user = useAuthStore((state) => state.user)
   const [rooms, setRooms] = useState<DiscoveryRoom[]>([])
   const [loadState, setLoadState] = useState<LoadState>("loading")
   const [errorMessage, setErrorMessage] = useState("")
@@ -61,12 +62,19 @@ export default function MyRoomsView() {
 
   useEffect(() => {
     const bootstrap = async () => {
-      if (!token) return
+      if (!token) {
+        // fallback to client-side known user id if available
+        setBackendUserId(user?.id ?? "")
+        return
+      }
+
       try {
         const sessionUser = await getDiscoverySessionUser(token)
         setBackendUserId(sessionUser.id)
       } catch {
-        setBackendUserId("")
+        // In production the session-user endpoint may fail due to env/cors/token issues.
+        // Fall back to the auth store's user id so "Mis salas" can still list creator rooms.
+        setBackendUserId(user?.id ?? "")
       }
     }
 
