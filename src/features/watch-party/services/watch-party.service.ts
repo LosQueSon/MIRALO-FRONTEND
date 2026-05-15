@@ -12,6 +12,7 @@ import {
   parseBackendUsersGenres,
 } from "@/lib/contracts/backend"
 import { ensureOk } from "@/lib/http/api"
+import { notifyRoomsUpdated } from "@/lib/rooms-sync"
 
 const normalizeRoom = (input: unknown): WatchPartyRoom | null => {
   const room = parseBackendRoom(input)
@@ -122,6 +123,7 @@ export const joinWatchPartyRoom = async (roomId: string, token: string): Promise
   })
 
   await ensureOk(response, "No fue posible unirte a la sala")
+  notifyRoomsUpdated()
 }
 
 export const leaveWatchPartyRoom = async (roomId: string, token: string): Promise<void> => {
@@ -133,6 +135,7 @@ export const leaveWatchPartyRoom = async (roomId: string, token: string): Promis
   })
 
   await ensureOk(response, "No fue posible salir de la sala")
+  notifyRoomsUpdated()
 }
 
 export const getUsersFavoriteGenres = async (roomId: string): Promise<UserFavoriteGenre[]> => {

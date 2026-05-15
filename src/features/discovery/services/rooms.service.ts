@@ -6,6 +6,7 @@
 } from "@/features/discovery/types"
 import { parseBackendRoom, parseBackendRooms, parseBackendSessionUser } from "@/lib/contracts/backend"
 import { ensureOk } from "@/lib/http/api"
+import { notifyRoomsUpdated } from "@/lib/rooms-sync"
 
 const backendBaseUrl = "/api/discovery/rooms"
 
@@ -81,6 +82,7 @@ export const createDiscoveryRoom = async (payload: DiscoveryRoomCreatePayload): 
     throw new Error("La room fue creada pero no pudo normalizarse la respuesta")
   }
 
+  notifyRoomsUpdated()
   return room
 }
 
@@ -115,6 +117,7 @@ export const joinDiscoveryRoom = async (roomId: string, token: string, accessCod
   })
 
   await ensureOk(response, "No fue posible unirse a la room")
+  notifyRoomsUpdated()
 }
 
 export const leaveDiscoveryRoom = async (roomId: string, token: string): Promise<void> => {
@@ -126,4 +129,5 @@ export const leaveDiscoveryRoom = async (roomId: string, token: string): Promise
   })
 
   await ensureOk(response, "No fue posible salir de la room")
+  notifyRoomsUpdated()
 }
