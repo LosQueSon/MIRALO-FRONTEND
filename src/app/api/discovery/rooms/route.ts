@@ -1,7 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 
 const backendBaseUrl = (process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000").replace(/\/$/, "")
-const demoHostId = process.env.DEMO_HOST_ID ?? process.env.NEXT_PUBLIC_DEMO_HOST_ID ?? "64b64c64b64c64b64c64c64c"
 
 export async function GET() {
   const response = await fetch(`${backendBaseUrl}/rooms`, {
@@ -26,9 +25,16 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  if (typeof body.hostId !== "string" || body.hostId.trim().length === 0) {
+    return NextResponse.json(
+      { code: "INVALID_HOST_ID", message: "El hostId es obligatorio para crear la sala" },
+      { status: 400 },
+    )
+  }
+
   const payload = {
     ...body,
-    hostId: typeof body.hostId === "string" && body.hostId.trim().length > 0 ? body.hostId : demoHostId,
+    hostId: body.hostId,
   }
 
   const response = await fetch(`${backendBaseUrl}/rooms/create`, {

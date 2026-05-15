@@ -42,6 +42,7 @@ const normalizeRoom = (input: unknown): DiscoveryRoom | null => {
     maxUsers: room.maxUsers,
     userCount: room.userIds.length,
     userIds: room.userIds,
+    hostId: room.hostId,
     genres: room.genres,
     contentUrl: room.contentUrl,
     updatedAtLabel: toDateLabel(room.updatedAt),

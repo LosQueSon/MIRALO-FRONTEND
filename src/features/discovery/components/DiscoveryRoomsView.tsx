@@ -41,7 +41,7 @@ const defaultForm = {
   name: "",
   contentUrl: "",
   genres: "comedy",
-  maxUsers: 8,
+  maxUsers: "8",
   isPrivate: false,
   accessCode: "",
 }
@@ -284,18 +284,33 @@ export default function DiscoveryRoomsView() {
       return
     }
 
+    const parsedMaxUsers = Number.parseInt(formState.maxUsers, 10)
+    if (!Number.isInteger(parsedMaxUsers) || parsedMaxUsers < 2 || parsedMaxUsers > 100) {
+      setCreateError("La capacidad máxima debe estar entre 2 y 100")
+      return
+    }
+
     setIsCreating(true)
     setCreateError("")
     setCreateMessage("")
+
+    const resolvedHostId = backendUserId || user?.id || ""
+
+    if (!resolvedHostId) {
+      setIsCreating(false)
+      setCreateError("No fue posible resolver tu usuario para crear la sala")
+      return
+    }
 
     try {
       const created = await createDiscoveryRoom({
         name: formState.name.trim(),
         contentUrl: formState.contentUrl.trim(),
         genres: formState.genres,
-        maxUsers: Number(formState.maxUsers),
+        maxUsers: parsedMaxUsers,
         isPrivate: formState.isPrivate,
         accessCode: formState.isPrivate ? formState.accessCode.trim() : "",
+        hostId: resolvedHostId,
       })
 
       setCreateMessage("Room creada correctamente")
@@ -533,10 +548,10 @@ export default function DiscoveryRoomsView() {
                     <select
                       value={formState.genres}
                       onChange={(event) => setFormState((current) => ({ ...current, genres: event.target.value }))}
-                      className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 px-4 text-sm text-white outline-none transition focus:border-red-500/40"
+                      className="h-12 w-full appearance-none rounded-2xl border border-red-500/40 bg-red-600 px-4 pr-10 text-sm font-medium text-white outline-none transition hover:bg-red-700 focus:border-red-400"
                     >
                       {genreOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
+                        <option key={option.value} value={option.value} className="bg-black text-white">
                           {option.label}
                         </option>
                       ))}
@@ -549,9 +564,11 @@ export default function DiscoveryRoomsView() {
                       type="number"
                       min={2}
                       max={100}
+                      step={1}
+                      inputMode="numeric"
                       value={formState.maxUsers}
-                      onChange={(event) => setFormState((current) => ({ ...current, maxUsers: Number(event.target.value) }))}
-                      className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 px-4 text-sm text-white outline-none transition focus:border-red-500/40"
+                      onChange={(event) => setFormState((current) => ({ ...current, maxUsers: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 px-4 text-sm text-white outline-none transition [appearance:textfield] [-moz-appearance:textfield] focus:border-red-500/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </label>
                 </div>

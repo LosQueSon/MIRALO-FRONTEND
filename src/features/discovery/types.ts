@@ -8,6 +8,7 @@ export interface DiscoveryRoom {
   maxUsers: number
   userCount: number
   userIds: string[]
+  hostId: string
   genres: string
   contentUrl: string
   updatedAtLabel: string

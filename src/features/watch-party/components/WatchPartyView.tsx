@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { useAuthStore } from "@/store/auth.store"
 import { getReady } from "@/lib/backend/health"
+import { REQUEST_LEAVE_ACTIVE_ROOM_EVENT } from "@/lib/room-navigation"
 import { useYouTubePlayer } from "../hooks/useYouTubePlayer"
 
 import {
@@ -690,7 +691,7 @@ export function WatchPartyView() {
     }
   }, [closeSocket, isCurrentUserInRoom, selectedRoomId, sessionUserId, socketRetryNonce, syncTime])
 
-  const handleLeaveRoom = async () => {
+  const handleLeaveRoom = async (redirectPath = "/discovery") => {
     if (!selectedRoomId || !token) {
       setError("No hay sala seleccionada o sesion activa")
       setIsLeaveModalOpen(false)
@@ -711,7 +712,7 @@ export function WatchPartyView() {
       closeSocket()
       await loadRooms(true)
       setIsLeaveModalOpen(false)
-      router.push("/discovery")
+      router.push(redirectPath)
     } catch (leaveError) {
       const message = leaveError instanceof Error ? leaveError.message : "No fue posible salir de la room"
       setError(message)
@@ -719,6 +720,26 @@ export function WatchPartyView() {
       setIsLeavingRoom(false)
     }
   }
+
+  useEffect(() => {
+    const handleLeaveRequest = (event: Event) => {
+      const customEvent = event as CustomEvent<{ targetPath?: string }>
+      const targetPath = customEvent.detail?.targetPath ?? "/discovery"
+
+      if (!selectedRoomId) {
+        router.push(targetPath)
+        return
+      }
+
+      void handleLeaveRoom(targetPath)
+    }
+
+    window.addEventListener(REQUEST_LEAVE_ACTIVE_ROOM_EVENT, handleLeaveRequest)
+
+    return () => {
+      window.removeEventListener(REQUEST_LEAVE_ACTIVE_ROOM_EVENT, handleLeaveRequest)
+    }
+  }, [handleLeaveRoom, router, selectedRoomId])
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-black/40">
@@ -747,23 +768,9 @@ export function WatchPartyView() {
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
               type="button"
-              onClick={() => setIsAutoRefreshEnabled((value) => !value)}
-              className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-xs font-medium text-white/70 hover:bg-white/10 transition"
-            >
-              {isAutoRefreshEnabled ? "⏸" : "▶"}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/discovery")}
-              className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-xs font-medium text-white/70 hover:bg-white/10 transition"
-            >
-              Atrás
-            </button>
-            <button
-              type="button"
               onClick={() => setIsLeaveModalOpen(true)}
               disabled={!selectedRoomId || isLeavingRoom}
-              className="h-9 px-4 rounded-lg bg-red-600 text-xs font-semibold text-white hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex h-11 min-w-[8.75rem] items-center justify-center rounded-xl bg-red-600 px-6 text-sm font-semibold text-white shadow-lg shadow-red-600/25 transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLeavingRoom ? "Saliendo..." : "Salir"}
             </button>

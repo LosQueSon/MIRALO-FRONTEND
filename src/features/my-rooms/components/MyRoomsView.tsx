@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth.store"
 import FeaturePageShell from "@/components/layout/FeaturePageShell"
 import { getDiscoveryRooms, getDiscoverySessionUser, joinDiscoveryRoom } from "@/features/discovery/services/rooms.service"
+import { ROOMS_UPDATED_EVENT, ROOMS_UPDATED_STORAGE_KEY } from "@/lib/rooms-sync"
 import type { DiscoveryRoom } from "@/features/discovery/types"
 
 type LoadState = "loading" | "success" | "empty" | "error"
@@ -78,7 +79,7 @@ export default function MyRoomsView() {
         setLoadState("loading")
         const response = await getDiscoveryRooms()
         const nextRooms = backendUserId
-          ? response.rooms.filter((room) => room.userIds.includes(backendUserId))
+          ? response.rooms.filter((room) => room.hostId === backendUserId || room.userIds.includes(backendUserId))
           : []
         setRooms(nextRooms)
         setLoadState(nextRooms.length > 0 ? "success" : "empty")
@@ -89,6 +90,52 @@ export default function MyRoomsView() {
     }
 
     void load()
+  }, [backendUserId])
+
+  useEffect(() => {
+    const refreshRooms = () => {
+      void getDiscoveryRooms().then((response) => {
+        const nextRooms = backendUserId
+          ? response.rooms.filter((room) => room.hostId === backendUserId || room.userIds.includes(backendUserId))
+          : []
+        setRooms(nextRooms)
+        setLoadState(nextRooms.length > 0 ? "success" : "empty")
+      }).catch((error) => {
+        setErrorMessage(error instanceof Error ? error.message : "No fue posible cargar tus salas")
+        setLoadState("error")
+      })
+    }
+
+    const handleRoomsUpdated = () => {
+      void refreshRooms()
+    }
+
+    const handleStorageUpdate = (event: StorageEvent) => {
+      if (event.key === ROOMS_UPDATED_STORAGE_KEY) {
+        void refreshRooms()
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshRooms()
+      }
+    }
+
+    window.addEventListener(ROOMS_UPDATED_EVENT, handleRoomsUpdated)
+    window.addEventListener("storage", handleStorageUpdate)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    const intervalId = window.setInterval(() => {
+      void refreshRooms()
+    }, 15000)
+
+    return () => {
+      window.removeEventListener(ROOMS_UPDATED_EVENT, handleRoomsUpdated)
+      window.removeEventListener("storage", handleStorageUpdate)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.clearInterval(intervalId)
+    }
   }, [backendUserId])
 
   const openRoom = async (roomId: string) => {

@@ -4,7 +4,7 @@ import { FormEvent, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth.store"
-import { createDiscoveryRoom } from "@/features/discovery/services/rooms.service"
+import { createDiscoveryRoom, getDiscoverySessionUser } from "@/features/discovery/services/rooms.service"
 import { notifyRoomsUpdated } from "@/lib/rooms-sync"
 
 const genreOptions = [
@@ -25,13 +25,15 @@ const defaultForm = {
   name: "",
   contentUrl: "",
   genres: "comedy",
-  maxUsers: 8,
+  maxUsers: "8",
   isPrivate: false,
   accessCode: "",
 }
 
 export default function CreateRoomModal() {
   const router = useRouter()
+  const user = useAuthStore((state) => state.user)
+  const token = useAuthStore((state) => state.token)
   const isOpen = useAuthStore((state) => state.isCreateRoomModalOpen)
   const closeModal = useAuthStore((state) => state.closeCreateRoomModal)
   const [isCreating, setIsCreating] = useState(false)
@@ -39,10 +41,39 @@ export default function CreateRoomModal() {
   const [error, setError] = useState("")
   const [formState, setFormState] = useState(defaultForm)
   const [mounted, setMounted] = useState(false)
+  const [backendHostId, setBackendHostId] = useState("")
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!token) {
+      setBackendHostId("")
+      return
+    }
+
+    let cancelled = false
+
+    const resolveHost = async () => {
+      try {
+        const sessionUser = await getDiscoverySessionUser(token)
+        if (!cancelled) {
+          setBackendHostId(sessionUser.id)
+        }
+      } catch {
+        if (!cancelled) {
+          setBackendHostId("")
+        }
+      }
+    }
+
+    void resolveHost()
+
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   const handleClose = () => {
     setMessage("")
@@ -59,18 +90,39 @@ export default function CreateRoomModal() {
       return
     }
 
+    const parsedMaxUsers = Number.parseInt(formState.maxUsers, 10)
+    if (!Number.isInteger(parsedMaxUsers) || parsedMaxUsers < 2 || parsedMaxUsers > 100) {
+      setError("La capacidad máxima debe estar entre 2 y 100")
+      return
+    }
+
     setIsCreating(true)
     setError("")
     setMessage("")
+
+    if (!token) {
+      setIsCreating(false)
+      setError("Necesitas una sesion activa para crear la sala")
+      return
+    }
+
+    const resolvedHostId = backendHostId || (await getDiscoverySessionUser(token).then((sessionUser) => sessionUser.id).catch(() => ""))
+
+    if (!resolvedHostId) {
+      setIsCreating(false)
+      setError("No fue posible resolver el host de la sala")
+      return
+    }
 
     try {
       const created = await createDiscoveryRoom({
         name: formState.name.trim(),
         contentUrl: formState.contentUrl.trim(),
         genres: formState.genres,
-        maxUsers: Number(formState.maxUsers),
+        maxUsers: parsedMaxUsers,
         isPrivate: formState.isPrivate,
         accessCode: formState.isPrivate ? formState.accessCode.trim() : "",
+        hostId: resolvedHostId,
       })
 
       notifyRoomsUpdated()
@@ -133,10 +185,10 @@ export default function CreateRoomModal() {
               <select
                 value={formState.genres}
                 onChange={(event) => setFormState((current) => ({ ...current, genres: event.target.value }))}
-                className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 px-4 text-sm text-white outline-none transition focus:border-red-500/40"
+                className="h-12 w-full appearance-none rounded-2xl border border-red-500/40 bg-red-600 px-4 pr-10 text-sm font-medium text-white outline-none transition hover:bg-red-700 focus:border-red-400"
               >
                 {genreOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
+                  <option key={option.value} value={option.value} className="bg-black text-white">
                     {option.label}
                   </option>
                 ))}
@@ -149,9 +201,11 @@ export default function CreateRoomModal() {
                 type="number"
                 min={2}
                 max={100}
+                step={1}
+                inputMode="numeric"
                 value={formState.maxUsers}
-                onChange={(event) => setFormState((current) => ({ ...current, maxUsers: Number(event.target.value) }))}
-                className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 px-4 text-sm text-white outline-none transition focus:border-red-500/40"
+                onChange={(event) => setFormState((current) => ({ ...current, maxUsers: event.target.value }))}
+                className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 px-4 text-sm text-white outline-none transition [appearance:textfield] [-moz-appearance:textfield] focus:border-red-500/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </label>
           </div>

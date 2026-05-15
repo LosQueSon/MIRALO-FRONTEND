@@ -1,11 +1,13 @@
 "use client"
 import { useAuthStore } from "@/store/auth.store"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { useAuthHydrated } from "@/features/auth/hooks/useAuthHydrated"
 import { motion } from "framer-motion"
 import CreateRoomModal from "@/components/layout/CreateRoomModal"
 import BackendStatusBanner from "@/components/layout/BackendStatusBanner"
+import ConfirmLeaveModal from "@/components/layout/ConfirmLeaveModal"
+import { REQUEST_LEAVE_ACTIVE_ROOM_EVENT } from "@/lib/room-navigation"
 
 const navItems = [
   { label: "Inicio", path: "/home" },
@@ -21,11 +23,16 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   const openCreateRoomModal = useAuthStore((state) => state.openCreateRoomModal)
   const isCreateRoomModalOpen = useAuthStore((state) => state.isCreateRoomModalOpen)
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const hydrated = useAuthHydrated()
   const currentPage = useMemo(() => ({ key: pathname, node: children }), [children, pathname])
   const [displayedPage, setDisplayedPage] = useState(currentPage)
   const [pendingPage, setPendingPage] = useState<typeof currentPage | null>(null)
   const [phase, setPhase] = useState<"idle" | "exiting" | "entering">("idle")
+  const [isLeaveRoomModalOpen, setIsLeaveRoomModalOpen] = useState(false)
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string>("")
+
+  const isInWatchPartyRoom = pathname === "/watch-party" && Boolean(searchParams.get("roomId"))
 
   useEffect(() => {
     if (currentPage.key === displayedPage.key) {
@@ -47,6 +54,34 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       router.replace("/login")
     }
   }, [hydrated, user, router])
+
+  const requestNavigation = (targetPath: string) => {
+    if (targetPath === "create-room") {
+      openCreateRoomModal()
+      return
+    }
+
+    if (isInWatchPartyRoom && targetPath !== pathname) {
+      setPendingNavigationPath(targetPath)
+      setIsLeaveRoomModalOpen(true)
+      return
+    }
+
+    router.push(targetPath)
+  }
+
+  const confirmRoomExitAndNavigate = () => {
+    const targetPath = pendingNavigationPath || "/home"
+
+    window.dispatchEvent(
+      new CustomEvent(REQUEST_LEAVE_ACTIVE_ROOM_EVENT, {
+        detail: { targetPath },
+      }),
+    )
+
+    setIsLeaveRoomModalOpen(false)
+    setPendingNavigationPath("")
+  }
 
   if (!hydrated) {
     return null
@@ -75,12 +110,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
             <button
               key={item.path}
               onClick={() => {
-                if (item.path === "create-room") {
-                  openCreateRoomModal()
-                  return
-                }
-
-                router.push(item.path)
+                requestNavigation(item.path)
               }}
               className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
                 item.path === "/home"
@@ -139,6 +169,18 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
           {displayedPage.node}
         </motion.div>
       </main>
+      <ConfirmLeaveModal
+        isOpen={isLeaveRoomModalOpen}
+        title="Salir de la sala"
+        message="Vas a salir de la sala activa para ir a otra sección. ¿Deseas continuar?"
+        confirmLabel="Salir"
+        cancelLabel="Cancelar"
+        onConfirm={confirmRoomExitAndNavigate}
+        onCancel={() => {
+          setIsLeaveRoomModalOpen(false)
+          setPendingNavigationPath("")
+        }}
+      />
       <CreateRoomModal />
     </div>
   )
