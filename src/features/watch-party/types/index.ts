@@ -37,3 +37,14 @@ export interface UserFavoriteGenre {
   userId: string
   favoriteGenre: string | null
 }
+
+// Re-export recommendation types
+export type {
+  RoomUser,
+  MovieRecommendation,
+  RecommendationsResponse,
+  RoomPoll,
+  RoomPollVote,
+  PollResponse,
+  RecommendationError,
+} from "./recommendations"

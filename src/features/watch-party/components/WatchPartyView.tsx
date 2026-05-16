@@ -19,9 +19,11 @@ import {
   resolveSessionUser,
   deleteRoom,
 } from "../services/watch-party.service"
+import { createRoomPoll } from "../services/recommendations.service"
 import { RoomChatPanel } from "./RoomChatPanel"
 import DeleteRoomModal from "./DeleteRoomModal"
-import type { WatchPartyRoom, WatchState } from "../types"
+import { RecommendationsModal } from "./RecommendationsModal"
+import type { WatchPartyRoom, WatchState, RoomUser } from "../types"
 
 const POLLING_INTERVAL_MS = 3000
 const SOCKET_RECONNECT_DELAY_MS = 2000
@@ -195,6 +197,9 @@ export function WatchPartyView() {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isDeletingRoom, setIsDeletingRoom] = useState(false)
+  const [isRecommendationsModalOpen, setIsRecommendationsModalOpen] = useState(false)
+  const [activePollId, setActivePollId] = useState<string | null>(null)
+  const [isCreatingPoll, setIsCreatingPoll] = useState(false)
   const [socketStatus, setSocketStatus] = useState<SocketStatus>("idle")
   const [socketRetryNonce, setSocketRetryNonce] = useState(0)
   const [isBackendReady, setIsBackendReady] = useState(true)
@@ -506,6 +511,44 @@ export function WatchPartyView() {
   const isPlaybackBlocked = !isBackendReady && isStrictRedisMode
   const participants = selectedRoom?.userIds ?? EMPTY_PARTICIPANTS
   const participantsKey = useMemo(() => participants.join("|"), [participants])
+  const recommendationUsers = useMemo<RoomUser[]>(
+    () =>
+      participants.map((userId) => ({
+        userId,
+        favoriteGenre: participantGenres[userId] || undefined,
+      })),
+    [participantGenres, participants],
+  )
+
+  const handleCreatePoll = useCallback(async () => {
+    if (!selectedRoomId || recommendationUsers.length === 0) {
+      throw new Error("No hay participantes para crear la encuesta")
+    }
+
+    try {
+      setIsCreatingPoll(true)
+      setError(null)
+      const poll = await createRoomPoll(recommendationUsers)
+      setActivePollId(poll.pollId)
+      // Broadcast poll creation to other room participants via watch socket
+      try {
+        const socket = socketRef.current
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ event: "poll_created", data: { pollId: poll.pollId } }))
+          console.log("[WebSocket Watch Party] Sent: poll_created", poll.pollId)
+        }
+      } catch (sendErr) {
+        console.warn("[WebSocket Watch Party] Could not send poll_created message:", sendErr)
+      }
+      return poll
+    } catch (pollError) {
+      const message = pollError instanceof Error ? pollError.message : "No fue posible crear la encuesta"
+      setError(message)
+      throw pollError
+    } finally {
+      setIsCreatingPoll(false)
+    }
+  }, [recommendationUsers, selectedRoomId])
   const isCurrentUserInRoom = sessionUserId ? participants.includes(sessionUserId) : false
 
   useEffect(() => {
@@ -653,6 +696,34 @@ export function WatchPartyView() {
 
           // Sincronizar el reproductor con el estado del backend
           syncTime(socketState.positionMs, socketState.isPlaying)
+          return
+        }
+
+        // When another participant creates a poll, open the recommendations modal
+        if (payload.event === "poll_created") {
+          try {
+            // payload.data may be either a string or an object { pollId }
+            let pollId: string | undefined
+            if (payload.data && typeof payload.data === "string") {
+              pollId = payload.data as string
+            } else if (payload.data && typeof payload.data === "object" && "pollId" in (payload.data as Record<string, unknown>)) {
+              pollId = (payload.data as Record<string, any>).pollId as string
+            } else if (typeof (payload as any).pollId === "string") {
+              pollId = (payload as any).pollId
+            }
+
+            if (pollId) {
+              console.log("[WebSocket Watch Party] Received poll_created", pollId)
+              setActivePollId(pollId)
+              setIsRecommendationsModalOpen(true)
+            } else {
+              console.warn("[WebSocket Watch Party] poll_created without pollId")
+            }
+          } catch (err) {
+            console.error("[WebSocket Watch Party] Error processing poll_created:", err)
+          }
+
+          return
         }
       } catch (error) {
         console.error("[WebSocket Watch Party] Error procesando mensaje:", error instanceof Error ? error.message : "Desconocido")
@@ -767,7 +838,7 @@ export function WatchPartyView() {
   }, [handleLeaveRoom, router, selectedRoomId])
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-black/40">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-black/40">
       {/* Control bar - Sticky header */}
       <div className="flex-shrink-0 border-b border-white/10 bg-black/60 backdrop-blur-sm px-6 py-4">
         <div className="flex items-center justify-between gap-4">
@@ -791,6 +862,15 @@ export function WatchPartyView() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={() => setIsRecommendationsModalOpen(true)}
+              disabled={!selectedRoomId || participants.length === 0}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Ver recomendaciones"
+            >
+              Recomendaciones
+            </button>
             {selectedRoom && sessionUserId === selectedRoom.hostId && (
               <>
                 <button
@@ -828,25 +908,25 @@ export function WatchPartyView() {
       />
 
       {/* Main content area */}
-      <div className="flex-1 overflow-hidden flex gap-6 p-6">
+      <div className="grid flex-1 min-h-0 grid-cols-[minmax(0,1fr)_20rem] gap-4 p-4 lg:gap-6 lg:p-6">
         {/* Video section - Left */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 overflow-hidden">
           {/* Reproductor */}
           <div
-            className="relative flex-1 rounded-2xl border border-white/10 bg-black/60 overflow-hidden"
+            className="relative min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-black/60"
             onMouseMove={showOverlayControls}
             onMouseEnter={showOverlayControls}
             onMouseLeave={hideOverlayControls}
             onTouchStart={showOverlayControls}
           >
             {isLoadingRooms ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex h-full items-center justify-center">
                 <p className="text-white/60">Cargando...</p>
               </div>
             ) : videoId ? (
-              <div id="youtube-player-container" className="flex-1 overflow-hidden rounded-lg" />
+              <div id="youtube-player-container" className="h-full w-full overflow-hidden rounded-lg" />
             ) : (
-              <div className="flex-1 flex items-center justify-center text-center p-6">
+              <div className="flex h-full items-center justify-center p-6 text-center">
                 <p className="text-sm text-white/60">Selecciona una sala con URL válida de YouTube</p>
               </div>
             )}
@@ -904,7 +984,7 @@ export function WatchPartyView() {
 
           {/* Playback controls - Bottom */}
           {selectedRoom && state && (
-            <div className="mt-4 space-y-3">
+            <div className="space-y-3">
               {isPlaybackBlocked ? (
                 <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
                   El backend no esta listo y Redis esta en modo estricto. Controles de reproduccion bloqueados temporalmente.
@@ -955,10 +1035,10 @@ export function WatchPartyView() {
         </div>
 
         {/* Right sidebar - Chat & Participants */}
-        <div className="w-80 flex flex-col gap-4 overflow-hidden">
+        <div className="flex min-h-0 w-full flex-col gap-4 overflow-hidden">
           {/* Participantes */}
           {selectedRoom && (
-            <div className="rounded-2xl border border-white/10 bg-black/60 p-4 flex flex-col">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/60 p-4">
               <div className="mb-3">
                 <p className="text-xs uppercase tracking-wider text-white/50 font-semibold">Participantes</p>
                 <p className="mt-1 text-lg font-bold text-white">{participants.length}/{selectedRoom.maxUsers}</p>
@@ -1008,7 +1088,7 @@ export function WatchPartyView() {
           )}
 
           {/* Chat */}
-          <div className="flex-1 rounded-2xl border border-white/10 bg-black/60 overflow-hidden flex flex-col min-h-0">
+          <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black/60 flex flex-col">
             <RoomChatPanel
               roomId={selectedRoomId}
               roomName={selectedRoom?.name ?? "Sala"}
@@ -1027,6 +1107,16 @@ export function WatchPartyView() {
         isSubmitting={isDeletingRoom}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleDeleteRoom}
+      />
+
+      <RecommendationsModal
+        isOpen={isRecommendationsModalOpen}
+        roomUsers={recommendationUsers}
+        activePollId={activePollId}
+        isCreatingPoll={isCreatingPoll}
+        onCreatePoll={handleCreatePoll}
+        currentUserId={sessionUserId}
+        onClose={() => setIsRecommendationsModalOpen(false)}
       />
     </div>
   )

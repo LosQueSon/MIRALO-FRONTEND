@@ -87,6 +87,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     return null
   }
 
+  const isWatchPartyRoute = pathname === "/watch-party"
+
   return (
     <div className="flex h-screen w-full bg-gradient-to-br from-zinc-900 via-black to-zinc-950 overflow-hidden gap-4 p-4">
       {/* Sidebar visual igual a LoggedHomeView */}
@@ -163,7 +165,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
               setPhase("idle")
             }
           }}
-          className="flex-1 overflow-y-auto rounded-3xl border border-white/10 bg-black/55 backdrop-blur-xl"
+          className={`${isWatchPartyRoute ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto"} rounded-3xl border border-white/10 bg-black/55 backdrop-blur-xl`}
           style={{ willChange: "opacity, transform" }}
         >
           {displayedPage.node}
